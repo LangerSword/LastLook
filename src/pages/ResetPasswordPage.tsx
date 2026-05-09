@@ -4,6 +4,7 @@ import { Lock, ArrowRight, Sparkles } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import AnimatedSection from '../components/motion/AnimatedSection';
 import SpectraNoise from '../components/motion/SpectraNoise';
+import PasswordStrengthMeter from '../components/PasswordStrengthMeter';
 
 export default function ResetPasswordPage() {
   const [newPassword, setNewPassword] = useState('');
@@ -11,6 +12,7 @@ export default function ResetPasswordPage() {
   const [status, setStatus] = useState<'idle' | 'loading' | 'success'>('idle');
   const [error, setError] = useState<string | null>(null);
   const [hasRecoverySession, setHasRecoverySession] = useState<boolean | null>(null);
+  const [isPasswordStrong, setIsPasswordStrong] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -125,7 +127,7 @@ export default function ResetPasswordPage() {
         ) : status === 'success' ? (
           <div className="text-center">
             <div className="mb-6 p-4 rounded-xl bg-ok-soft border border-ok/20 text-ok text-[13px] animate-fade-in">
-              Password updated successfully! Redirecting...
+              Password updated. We’ll notify you by email if security notifications are enabled. Redirecting...
             </div>
           </div>
         ) : (
@@ -146,6 +148,12 @@ export default function ResetPasswordPage() {
                   minLength={8}
                 />
               </div>
+              {newPassword && (
+                <PasswordStrengthMeter 
+                  password={newPassword} 
+                  onStrengthChange={setIsPasswordStrong} 
+                />
+              )}
             </div>
 
             <div>
@@ -168,7 +176,7 @@ export default function ResetPasswordPage() {
 
             <button
               type="submit"
-              disabled={status === 'loading' || !newPassword || !confirmPassword}
+              disabled={status === 'loading' || !newPassword || !confirmPassword || !isPasswordStrong}
               className="w-full flex justify-center items-center gap-2 px-4 py-3 bg-ink hover:bg-ink-secondary disabled:bg-surface-muted disabled:text-ink-faint text-canvas text-[14px] font-semibold rounded-xl shadow-sm transition-all duration-200 mt-6"
             >
               {status === 'loading' ? (

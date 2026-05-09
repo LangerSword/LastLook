@@ -1,6 +1,6 @@
 import { callLLM } from '../lib/callLLM';
 import { ANALYZE_SYSTEM, GENERATE_SYSTEM, CHECK_SYSTEM } from '../lib/prompts';
-import { verifyUser } from '../lib/auth';
+import { verifyUserWithReason, isServerSupabaseConfigured } from '../lib/auth';
 import { checkAndLogUsage } from '../lib/usage';
 
 interface Env {
@@ -18,13 +18,23 @@ interface Env {
 
 export const onRequestPost: PagesFunction<Env> = async (context) => {
   try {
-    const user = await verifyUser(context.request, context.env);
-    if (!user) {
+    const result = await verifyUserWithReason(context.request, context.env);
+    
+    if (result.error === 'server_not_configured') {
       return new Response(JSON.stringify({
-        error: 'auth_required',
-        message: 'Sign in to run a real LastLook review. You can still try the sample demo.'
+        error: 'supabase_server_not_configured',
+        message: 'Server auth is not configured. Add SUPABASE_URL and SUPABASE_ANON_KEY.'
       }), { status: 401, headers: { 'Content-Type': 'application/json' } });
     }
+    
+    if (result.error === 'no_token' || result.error === 'invalid_token') {
+      return new Response(JSON.stringify({
+        error: 'auth_required',
+        message: 'Sign in to run a real LastLook review.'
+      }), { status: 401, headers: { 'Content-Type': 'application/json' } });
+    }
+    
+    const user = result.user;
 
     // Since this is a combined call, we check limit FIRST to avoid wasting AI calls if quota is exceeded.
     // However, we need provider/model to log. We can log after the first AI call.

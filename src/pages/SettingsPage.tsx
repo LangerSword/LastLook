@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react';
 import { CheckCircle2, AlertTriangle, ChevronDown } from 'lucide-react';
 import AnimatedSection from '../components/motion/AnimatedSection';
 import ThemeToggle from '../components/ThemeToggle';
-import { getHealth } from '../lib/api';
+import { getHealth, type HealthResponse } from '../lib/api';
 import type { Theme } from '../lib/theme';
 import { useAuth } from '../contexts/AuthContext';
 import { applyTheme, initializeTheme, setStoredTheme } from '../lib/theme';
 import { useUsage } from '../hooks/useUsage';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
 
 const IS_DEV = import.meta.env.DEV;
 
@@ -16,15 +18,36 @@ export default function SettingsPage() {
   const [defaultStrictness, setDefaultStrictness] = useState('Balanced');
   const [defaultType, setDefaultType] = useState('Fellowship');
   const [debugOpen, setDebugOpen] = useState(false);
+  const [mfaEnabled, setMfaEnabled] = useState(false);
+  const [serverSupabaseStatus, setServerSupabaseStatus] = useState<string>('unknown');
+  const [hasAccessToken, setHasAccessToken] = useState<boolean | null>(null);
 
   const { user, session, isSupabaseConfigured, isAuthenticated, isDemoMode } = useAuth();
   const usage = useUsage();
+  const navigate = useNavigate();
 
   useEffect(() => {
     getHealth()
-      .then(() => setProviderStatus('ok'))
+      .then((data) => {
+        setProviderStatus('ok');
+        if ('supabase' in data && data.supabase?.server) {
+          setServerSupabaseStatus(data.supabase.server);
+        }
+      })
       .catch(() => setProviderStatus('warn'));
   }, []);
+
+  useEffect(() => {
+    const checkAccessToken = async () => {
+      if (supabase && isSupabaseConfigured) {
+        const { data } = await supabase.auth.getSession();
+        setHasAccessToken(!!data.session?.access_token);
+      } else {
+        setHasAccessToken(null);
+      }
+    };
+    checkAccessToken();
+  }, [session]);
 
   useEffect(() => {
     const current = initializeTheme();
@@ -37,6 +60,17 @@ export default function SettingsPage() {
     if (storedStrictness) setDefaultStrictness(storedStrictness);
     if (storedType) setDefaultType(storedType);
   }, []);
+
+  useEffect(() => {
+    if (supabase && isAuthenticated) {
+      supabase.auth.mfa.listFactors().then(({ data }) => {
+        if (data?.totp) {
+          const verified = data.totp.filter((f: any) => f.status === 'verified');
+          setMfaEnabled(verified.length > 0);
+        }
+      });
+    }
+  }, [isAuthenticated]);
 
   const handleThemeChange = (value: Theme) => {
     setStoredTheme(value);
@@ -173,6 +207,45 @@ export default function SettingsPage() {
         )}
       </div>
 
+      {/* Security Navigation */}
+      <div className="rounded-3xl border border-edge bg-surface p-6 shadow-soft space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="text-[13px] font-semibold text-ink">Security &amp; Data</div>
+            <div className="text-[12px] text-ink-secondary">Manage 2FA, password, and active sessions.</div>
+          </div>
+          <button 
+            onClick={() => navigate('/settings/security')}
+            className="px-4 py-2 bg-surface border border-edge text-ink text-[13px] font-semibold rounded-lg hover:bg-surface-muted transition-all duration-200"
+          >
+            Security Settings
+          </button>
+        </div>
+      </div>
+
+      {/* Security Audit Hints */}
+      <div className="rounded-3xl border border-edge bg-surface p-6 shadow-soft space-y-4">
+        <div>
+          <div className="text-[13px] font-semibold text-ink">Security Audit Hints</div>
+          <div className="text-[12px] text-ink-secondary mb-4">Quick overview of your active security protections.</div>
+        </div>
+        <div className="space-y-2">
+          {[
+            ['Supabase configured', isSupabaseConfigured],
+            ['MFA enabled', mfaEnabled],
+            ['BYOK active', Boolean(sessionStorage.getItem('lastlook_byok'))],
+            ['Shared quota protected', isSupabaseConfigured && !isDemoMode]
+          ].map(([label, value]) => (
+            <div key={String(label)} className="flex items-center justify-between py-2 border-b border-edge last:border-0">
+              <span className="text-[13px] text-ink-secondary">{String(label)}</span>
+              <span className={`text-[12px] font-medium ${value ? 'text-ok' : 'text-warn'}`}>
+                {value ? 'Yes' : 'No'}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Dev Debug Panel — development only */}
       {IS_DEV && (
         <div className="rounded-3xl border border-edge bg-surface p-6 shadow-soft">
@@ -194,11 +267,11 @@ export default function SettingsPage() {
           {debugOpen && (
             <div className="mt-4 space-y-2 font-mono text-[12px]">
               {[
-                ['VITE_SUPABASE_URL present', Boolean(import.meta.env.VITE_SUPABASE_URL)],
-                ['VITE_SUPABASE_ANON_KEY present', Boolean(import.meta.env.VITE_SUPABASE_ANON_KEY)],
                 ['isSupabaseConfigured', isSupabaseConfigured],
+                ['server Supabase (from /api/health)', serverSupabaseStatus],
                 ['session exists', Boolean(session)],
-                ['user email present', Boolean(user?.email)],
+                ['user email', user?.email || null],
+                ['access token exists', hasAccessToken],
                 ['isAuthenticated', isAuthenticated],
                 ['isDemoMode', isDemoMode],
                 ['storage mode', isAuthenticated ? 'supabase' : 'localStorage'],

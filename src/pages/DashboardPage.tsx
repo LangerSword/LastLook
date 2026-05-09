@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Activity, CheckCircle2, FileText, ArrowUpRight, Clock, Search, Trash2 } from 'lucide-react';
+import { Activity, CheckCircle2, FileText, ArrowUpRight, Clock, Search, Trash2, AlertTriangle, Sparkles } from 'lucide-react';
 import { deleteReviewSession, getReviewSessions, type ReviewSession } from '../lib/reviewStore';
 import AnimatedSection from '../components/motion/AnimatedSection';
 import SpectraNoise from '../components/motion/SpectraNoise';
@@ -171,6 +171,40 @@ export default function DashboardPage() {
   const latestScore = latest.readinessReport?.score || 0;
   const latestStatus = statusFromScore(latestScore);
 
+  const insight = useMemo(() => {
+    if (sessions.length < 2) return null;
+    
+    const avg = fitSnapshotAverages.find(f => f.name === 'Specificity')?.value || 0;
+    const clarity = fitSnapshotAverages.find(f => f.name === 'Clarity')?.value || 0;
+    
+    if (avg < 60 && clarity >= 70) {
+      return {
+        title: 'Strong clarity, weaker specificity',
+        desc: 'Your answers are well-structured but could use more concrete, program-specific details. Add one program-specific sentence earlier in each answer.',
+        type: 'suggestion' as const,
+      };
+    }
+    if (needsFixes > sessions.length * 0.5) {
+      return {
+        title: 'High blocker rate',
+        desc: 'Multiple reviews need fixes. Focus on the top critical issue from each review before submitting.',
+        type: 'warning' as const,
+      };
+    }
+    if (avgScore >= 80) {
+      return {
+        title: 'Strong readiness trend',
+        desc: `Your average score is ${avgScore}%. You're consistently producing high-quality applications.`,
+        type: 'success' as const,
+      };
+    }
+    return {
+      title: 'Room for improvement',
+      desc: 'Keep iterating. Each review builds your understanding of what makes applications strong.',
+      type: 'neutral' as const,
+    };
+  }, [sessions.length, fitSnapshotAverages, needsFixes, avgScore]);
+
   return (
     <div className="relative pb-20 pt-10">
       <SpectraNoise className="opacity-60" />
@@ -196,6 +230,34 @@ export default function DashboardPage() {
             ))}
           </StaggeredReveal>
         </AnimatedSection>
+
+        {insight && (
+          <AnimatedSection className="mb-8">
+            <div className={`rounded-2xl border p-5 shadow-soft ${
+              insight.type === 'success' ? 'bg-[var(--success-soft)] border-[var(--success)]/20' :
+              insight.type === 'warning' ? 'bg-[var(--warning-soft)] border-[var(--warning)]/20' :
+              insight.type === 'suggestion' ? 'bg-[var(--accent-soft)] border-[var(--accent)]/20' :
+              'bg-surface border-edge'
+            }`}>
+              <div className="flex items-start gap-4">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                  insight.type === 'success' ? 'bg-[var(--success)]/10' :
+                  insight.type === 'warning' ? 'bg-[var(--warning)]/10' :
+                  insight.type === 'suggestion' ? 'bg-[var(--accent)]/10' :
+                  'bg-surface-muted'
+                }`}>
+                  {insight.type === 'success' ? <CheckCircle2 className="w-5 h-5 text-[var(--success)]" /> :
+                   insight.type === 'warning' ? <AlertTriangle className="w-5 h-5 text-[var(--warning)]" /> :
+                   <Sparkles className="w-5 h-5 text-[var(--accent)]" />}
+                </div>
+                <div>
+                  <div className="text-[13px] font-semibold text-ink">{insight.title}</div>
+                  <div className="text-[12px] text-ink-secondary mt-1">{insight.desc}</div>
+                </div>
+              </div>
+            </div>
+          </AnimatedSection>
+        )}
 
         <AnimatedSection className="mb-8">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

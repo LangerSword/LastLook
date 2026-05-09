@@ -14,18 +14,28 @@ interface Env {
   ADMIN_EMAILS?: string;
 }
 
-import { verifyUser } from '../lib/auth';
+import { verifyUserWithReason } from '../lib/auth';
 import { checkAndLogUsage } from '../lib/usage';
 
 export const onRequestPost: PagesFunction<Env> = async (context) => {
   try {
-    const user = await verifyUser(context.request, context.env);
-    if (!user) {
+    const result = await verifyUserWithReason(context.request, context.env);
+    
+    if (result.error === 'server_not_configured') {
       return new Response(JSON.stringify({
-        error: 'auth_required',
-        message: 'Sign in to run a real LastLook review. You can still try the sample demo.'
+        error: 'supabase_server_not_configured',
+        message: 'Server auth is not configured. Add SUPABASE_URL and SUPABASE_ANON_KEY.'
       }), { status: 401, headers: { 'Content-Type': 'application/json' } });
     }
+    
+    if (result.error === 'no_token' || result.error === 'invalid_token') {
+      return new Response(JSON.stringify({
+        error: 'auth_required',
+        message: 'Sign in to run a real LastLook review.'
+      }), { status: 401, headers: { 'Content-Type': 'application/json' } });
+    }
+    
+    const user = result.user;
 
     const body = await context.request.json() as any;
 

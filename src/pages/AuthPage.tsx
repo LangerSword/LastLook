@@ -4,6 +4,7 @@ import { Mail, Lock, ArrowRight, ShieldCheck, Sparkles } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import AnimatedSection from '../components/motion/AnimatedSection';
 import SpectraNoise from '../components/motion/SpectraNoise';
+import PasswordStrengthMeter from '../components/PasswordStrengthMeter';
 
 export default function AuthPage() {
   const [email, setEmail] = useState('');
@@ -12,6 +13,7 @@ export default function AuthPage() {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isPasswordStrong, setIsPasswordStrong] = useState(false);
 
   const navigate = useNavigate();
   const { signIn, signUp, enableDemoMode, isSupabaseConfigured } = useAuth();
@@ -38,6 +40,8 @@ export default function AuthPage() {
       setLoading(false);
       if (res.error) {
         setError(res.error);
+      } else if (res.requiresMfa) {
+        navigate('/mfa-challenge');
       } else {
         navigate('/app');
       }
@@ -175,11 +179,17 @@ export default function AuthPage() {
                   </button>
                 </div>
               )}
+              {isSignUp && password && (
+                <PasswordStrengthMeter 
+                  password={password} 
+                  onStrengthChange={setIsPasswordStrong} 
+                />
+              )}
             </div>
 
             <button
               type="submit"
-              disabled={loading || !email || !password}
+              disabled={loading || !email || !password || (isSignUp && !isPasswordStrong)}
               className="w-full flex justify-center items-center gap-2 px-4 py-3 bg-ink hover:bg-ink-secondary disabled:bg-surface-muted disabled:text-ink-faint text-canvas text-[14px] font-semibold rounded-xl shadow-sm transition-all duration-200 mt-6"
             >
               {loading ? (

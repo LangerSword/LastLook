@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Sparkles, Play, ChevronDown } from 'lucide-react';
+import { Sparkles, Play, ChevronDown, Zap } from 'lucide-react';
 import type { UserMemory, BriefAnalysis, GeneratedAnswer, CheckResult, ToneOption, LengthOption, ApplicationType, ReviewStrictness } from '../lib/types';
 import { loadMemory, saveMemory } from '../lib/storage';
 import { sampleProfile, sampleBrief, sampleQuestion, sampleWeakAnswer } from '../lib/sampleData';
@@ -285,30 +285,38 @@ export default function AppWorkspace() {
 
   return (
     <div className="pb-20 pt-8 animate-fade-in">
-      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between mb-6 gap-4">
+      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between mb-8 gap-6">
         <div>
-          <span className="font-mono text-[10px] text-ink-muted uppercase tracking-widest">review workspace</span>
-          <h2 className="text-[clamp(1.6rem,2.8vw,2.2rem)] font-semibold text-ink mt-2">Build a decision-ready review.</h2>
-          <p className="text-[13px] text-ink-secondary mt-2">
-            Configure the opportunity, tailor the review, and run the reviewer panel.
+          <div className="flex items-center gap-3 mb-3">
+            <span className="font-mono text-[10px] text-ink-muted uppercase tracking-widest">workspace</span>
+            {isAuthenticated && !isDemoMode && (
+              <span className="px-2 py-0.5 rounded-full bg-[var(--success-soft)] text-[var(--success)] text-[10px] font-semibold">
+                {usage.fullReviewsUsed}/5 reviews today
+              </span>
+            )}
+          </div>
+          <h2 className="text-[clamp(1.6rem,2.8vw,2.2rem)] font-bold text-ink mt-2 font-headline">Build a decision-ready review.</h2>
+          <p className="text-[14px] text-ink-secondary mt-2 max-w-xl">
+            Configure the opportunity, tailor the review, and run the specialist reviewer panel.
           </p>
         </div>
 
-        <div className="flex items-center gap-2 p-1 bg-surface-muted rounded-xl border border-edge">
+        <div className="flex items-center gap-3 p-1.5 bg-surface rounded-2xl border border-edge shadow-sm">
           <button
             onClick={() => setRunMode('step')}
-            className={`px-3 py-1.5 text-[12px] font-medium rounded-lg transition-colors ${runMode === 'step' ? 'bg-surface shadow-sm text-ink' : 'text-ink-secondary hover:text-ink'}`}
+            className={`px-4 py-2 text-[12px] font-semibold rounded-xl transition-all ${runMode === 'step' ? 'bg-[var(--accent)] text-white shadow-md' : 'text-ink-secondary hover:text-ink hover:bg-surface-muted'}`}
           >
             Step-by-step
           </button>
           <button
             onClick={() => setRunMode('full')}
-            className={`px-3 py-1.5 text-[12px] font-medium rounded-lg transition-colors ${runMode === 'full' ? 'bg-surface shadow-sm text-ink' : 'text-ink-secondary hover:text-ink'}`}
+            className={`px-4 py-2 text-[12px] font-semibold rounded-xl transition-all ${runMode === 'full' ? 'bg-[var(--accent)] text-white shadow-md' : 'text-ink-secondary hover:text-ink hover:bg-surface-muted'}`}
           >
             Full LastLook
           </button>
-          <button onClick={handleDemo} className="ml-2 px-3 py-1.5 text-[12px] font-medium rounded-lg transition-colors bg-yc-soft text-yc hover:bg-yc hover:text-[var(--button-text)]">
-            Load Demo
+          <div className="w-px h-6 bg-edge mx-1" />
+          <button onClick={handleDemo} className="px-4 py-2 text-[12px] font-medium rounded-xl transition-colors text-ink-secondary hover:text-ink hover:bg-surface-muted">
+            Demo
           </button>
         </div>
       </div>
@@ -330,12 +338,15 @@ export default function AppWorkspace() {
         ]}
       />
       
-      <div className="rounded-3xl border border-edge bg-surface-muted/30 p-2 sm:p-4 shadow-soft">
-        <div className="grid gap-4 sm:gap-6 [grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr))]">
+      <div className="rounded-3xl border border-edge bg-[var(--surface-muted)]/50 p-3 sm:p-5 shadow-soft">
+        <div className="grid gap-5 sm:gap-6 [grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr))]">
           {/* Left Column: Inputs */}
-          <div className="space-y-4">
-            <div className="rounded-2xl border border-edge bg-surface p-5 shadow-sm">
-              <span className="font-mono text-[10px] text-ink-muted uppercase tracking-widest">1 / opportunity</span>
+          <div className="space-y-5">
+            <div className="rounded-2xl border border-edge bg-surface p-5 shadow-card hover:shadow-card-hover transition-shadow">
+              <div className="flex items-center justify-between mb-4">
+                <span className="font-mono text-[10px] text-ink-muted uppercase tracking-widest">Opportunity</span>
+                <span className="w-6 h-6 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)] text-[10px] font-bold">1</span>
+              </div>
               <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                 <label className="text-[12px] text-ink-secondary">
                   Program name
@@ -374,13 +385,22 @@ export default function AppWorkspace() {
             </div>
 
             {runMode === 'full' && (
-              <div className="rounded-2xl border border-edge bg-surface p-5 shadow-sm mt-4">
+              <div className="rounded-2xl border border-edge bg-gradient-to-br from-surface to-[var(--accent-soft)] p-5 shadow-card hover:shadow-card-hover transition-all mt-4">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-xl bg-[var(--accent)] flex items-center justify-center">
+                    <Sparkles className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <div className="text-[14px] font-semibold text-ink">Full LastLook</div>
+                    <div className="text-[11px] text-ink-muted">Run all 6 reviewer agents</div>
+                  </div>
+                </div>
                 <p className="text-[13px] text-ink-secondary mb-4">
                   Run the full reviewer panel in one pass when your brief and answer are ready.
                 </p>
-                {isFullReviewLimitHit && <div className="mb-4 p-3 rounded-xl bg-surface-muted text-ink-muted text-[13px] border border-edge">{limitMsg}</div>}
-                <button onClick={handleRunFull} disabled={loadingState?.active || isFullReviewLimitHit} className="w-full flex justify-center items-center gap-2 px-5 py-3 bg-yc hover:bg-yc-hover disabled:bg-surface-muted disabled:text-ink-faint text-canvas text-[14px] font-semibold rounded-xl shadow-sm transition-all duration-200 cursor-pointer">
-                  <Sparkles className="w-4 h-4" /> {loadingState?.active ? 'Running...' : 'Run full LastLook'}
+                {isFullReviewLimitHit && <div className="mb-4 p-3 rounded-xl bg-[var(--warning-soft)] text-[var(--warning)] text-[13px] border border-[var(--warning)]/20">{limitMsg}</div>}
+                <button onClick={handleRunFull} disabled={loadingState?.active || isFullReviewLimitHit} className="w-full flex justify-center items-center gap-2 px-5 py-3 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:bg-surface-muted disabled:text-ink-faint text-white text-[14px] font-semibold rounded-xl shadow-lg shadow-[var(--accent)]/20 hover:shadow-xl hover:shadow-[var(--accent)]/30 transition-all duration-200 cursor-pointer">
+                  <Zap className="w-4 h-4" /> {loadingState?.active ? 'Running full review...' : 'Run full LastLook'}
                 </button>
               </div>
             )}

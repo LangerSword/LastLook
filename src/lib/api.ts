@@ -4,33 +4,35 @@ import {
   normalizeGenerateResponse,
   normalizeCheckResponse,
 } from './parseAiResponse';
-import { supabase } from './supabase';
-import { useAuth } from '../contexts/AuthContext';
+import { supabase, isSupabaseConfigured } from './supabase';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 const API_BASE = `${API_BASE_URL}/api`;
 
-/**
- * Helper to intercept calls in Demo Mode.
- * Unauthenticated users or users actively choosing demo mode should NOT hit the real backend,
- * saving quota and returning mock data instantly.
- */
-function isLocalDemoMode(): boolean {
-  return localStorage.getItem('lastlook_demo_mode') === 'true' || !import.meta.env.VITE_SUPABASE_URL;
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+
+  if (supabase && isSupabaseConfigured) {
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+  }
+
+  return headers;
 }
 
-async function getAuthToken(): Promise<string | null> {
-  if (!supabase) return null;
-  const { data } = await supabase.auth.getSession();
-  return data.session?.access_token || null;
+function isLocalDemoMode(): boolean {
+  if (!isSupabaseConfigured) {
+    return true;
+  }
+  return localStorage.getItem('lastlook_demo_mode') === 'true';
 }
 
 async function post(path: string, body: unknown): Promise<unknown> {
-  const token = await getAuthToken();
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
+  const headers = await getAuthHeaders();
 
   let res: Response;
   try {
@@ -45,7 +47,28 @@ async function post(path: string, body: unknown): Promise<unknown> {
 
   if (!res.ok) {
     if (res.status === 401) {
-      throw new Error('auth_required: Sign in to run a real LastLook review. You can still try the sample demo.');
+      let errMsg = 'Sign in to run a real LastLook review. You can still try the sample demo.';
+      try {
+        const parsed = await res.json();
+        if (parsed.message) {
+          errMsg = parsed.message;
+        } else if (parsed.error) {
+          errMsg = parsed.error === 'supabase_server_not_configured' 
+            ? 'Server auth is not configured. Add SUPABASE_URL and SUPABASE_ANON_KEY to your environment.'
+            : parsed.error;
+        }
+      } catch {}
+      
+      const fullError = `auth_required: ${errMsg}`;
+      if (import.meta.env.DEV && supabase && isSupabaseConfigured) {
+        try {
+          const { data } = await supabase.auth.getSession();
+          if (data.session?.access_token) {
+            throw new Error(`${fullError}\n\nDebug hint: Your session exists, but the API did not receive it. Check Authorization header in src/lib/api.ts.`);
+          }
+        } catch {}
+      }
+      throw new Error(fullError);
     }
     if (res.status === 429) {
       const errMsg = await res.json().catch(() => ({}));
@@ -137,14 +160,25 @@ export async function checkAnswer(params: {
   return normalizeCheckResponse(data, params.wordCount, params.speakingTimeSeconds);
 }
 
-export async function getHealth(): Promise<{ status: string }> {
+export interface HealthResponse {
+  ok: boolean;
+  providers: Record<string, unknown>;
+  supabase?: {
+    frontendExpected: boolean;
+    server: string;
+  };
+  authRequiredForAi?: boolean;
+  limits?: Record<string, unknown>;
+}
+
+export async function getHealth(): Promise<HealthResponse> {
   try {
     const res = await fetch(`${API_BASE}/health`);
     if (!res.ok) {
       if (res.status === 502 || res.status === 504 || res.status === 404) {
         throw new Error('Could not reach the AI backend. Run npm run pages:dev for full local testing.');
       }
-      return { status: 'error' };
+      return { ok: false, providers: {} };
     }
     return res.json();
   } catch (err) {

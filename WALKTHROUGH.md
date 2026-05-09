@@ -17,7 +17,9 @@ LastLook is a pre-submit checker for student applications — fellowships, hacka
 3. **Generate a tailored answer** — personalized to your profile
 4. **Run a final check** — readiness score, critical issues, fix order
 
-**Review Limits:** To prevent abuse, free authenticated users are limited to 5 full reviews or 15 individual actions per day. Unauthenticated users can only run the built-in sample demo.
+**Review Limits:** To prevent abuse, free authenticated users are limited to 5 full reviews or 15 individual actions per day. Unauthenticated users can only run the built-in sample demo. Admin emails bypass limits.
+
+**Security Features:** LastLook supports 2FA/MFA (TOTP), password strength enforcement, security notification emails (via Supabase), BYOK keys stored only in sessionStorage, and session management (sign out everywhere, delete data). MFA setup is available at `/settings/security`.
 
 No login required for the demo. Open the URL and start.
 
@@ -211,14 +213,39 @@ LastLook can run without a database (Demo Mode), but if you configure Supabase (
 - Production: `https://YOUR_DOMAIN`
 
 **Redirect URLs:**
-- `http://localhost:8788/auth/callback`
+
+*Auth Callback URLs:*
 - `http://localhost:5173/auth/callback`
-- `https://YOUR_DOMAIN/auth/callback`
-- `https://YOUR_PAGES_DEV_URL/auth/callback`
-- `http://localhost:8788/reset-password`
+- `http://localhost:8788/auth/callback`
+- `https://YOUR_PAGES_URL.pages.dev/auth/callback`
+- `https://YOUR_CUSTOM_DOMAIN/auth/callback`
+
+*Password Reset URLs:*
 - `http://localhost:5173/reset-password`
-- `https://YOUR_DOMAIN/reset-password`
-- `https://YOUR_PAGES_DEV_URL/reset-password`
+- `http://localhost:8788/reset-password`
+- `https://YOUR_PAGES_URL.pages.dev/reset-password`
+- `https://YOUR_CUSTOM_DOMAIN/reset-password`
+
+*MFA Challenge URLs:*
+- `http://localhost:5173/mfa-challenge`
+- `http://localhost:8788/mfa-challenge`
+- `https://YOUR_PAGES_URL.pages.dev/mfa-challenge`
+- `https://YOUR_CUSTOM_DOMAIN/mfa-challenge`
+
+**Security Notifications:**
+Under **Authentication → Emails → Email Templates → Security Notifications**, enable:
+- Password changed
+- MFA method added
+- MFA method removed
+- Email address changed
+
+These are optional but recommended for user security awareness.
+
+**BYOK Key Storage:**
+If users provide their own API key (BYOK), it is stored only in browser `sessionStorage` and is:
+- Never sent to LastLook servers
+- Never stored in Supabase
+- Cleared on sign out
 
 ---
 

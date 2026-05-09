@@ -30,7 +30,7 @@ interface AuthContextValue {
    */
   isDemoMode: boolean;
   /** Sign in with email + password */
-  signIn: (email: string, password: string) => Promise<{ error: string | null }>;
+  signIn: (email: string, password: string) => Promise<{ error: string | null; requiresMfa?: boolean }>;
   /** Sign up with email + password (includes redirect URL) */
   signUp: (email: string, password: string) => Promise<{ error: string | null }>;
   /** Sign out and clear demo mode flag */
@@ -132,10 +132,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const signIn = useCallback(async (email: string, password: string): Promise<{ error: string | null }> => {
+  const signIn = useCallback(async (email: string, password: string): Promise<{ error: string | null; requiresMfa?: boolean }> => {
     if (!supabase) return { error: 'Supabase is not configured.' };
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error: error?.message ?? null };
+    if (error) return { error: error.message };
+
+    const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (aalData?.nextLevel === 'aal2' && aalData?.currentLevel === 'aal1') {
+      return { error: null, requiresMfa: true };
+    }
+
+    return { error: null, requiresMfa: false };
   }, []);
 
   const signUp = useCallback(async (email: string, password: string): Promise<{ error: string | null }> => {
@@ -151,6 +158,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     localStorage.removeItem(DEMO_MODE_KEY);
+    sessionStorage.removeItem('lastlook_byok');
     setIsDemoMode(false);
     if (supabase) {
       await supabase.auth.signOut();

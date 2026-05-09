@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Copy, FileText, LayoutDashboard, Share2, AlertTriangle } from 'lucide-react';
+import { Copy, FileText, LayoutDashboard, Share2, AlertTriangle, Zap, Sparkles } from 'lucide-react';
 import { getReviewSessions, type ReviewSession } from '../lib/reviewStore';
 import { normalizeReviewSession } from '../lib/reviewNormalizer';
 import MetricCard from '../components/dashboard/MetricCard';
@@ -10,6 +10,7 @@ import FixPlan from '../components/review/FixPlan';
 import AnswerComparison from '../components/review/AnswerComparison';
 import NextBestEditCard from '../components/review/NextBestEditCard';
 import AnimatedSection from '../components/motion/AnimatedSection';
+import ReadinessRing from '../components/motion/ReadinessRing';
 
 export default function ReviewDetailPage() {
   const { id } = useParams();
@@ -86,10 +87,18 @@ export default function ReviewDetailPage() {
       </AnimatedSection>
 
       <AnimatedSection>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <NextBestEditCard verdict={summary.verdict} nextBestEdit={summary.nextBestEdit} topFix={summary.topFix} />
-          <MetricCard label="Readiness Score" value={report.score} helper={report.status} accent={report.score >= 80 ? 'ok' : report.score >= 60 ? 'warn' : 'err'} icon={<LayoutDashboard className="w-4 h-4" />} />
-          <MetricCard label="Blocking Issues" value={report.criticalIssues.length} helper={summary.evaluatorRisk} accent={report.criticalIssues.length ? 'err' : 'ok'} icon={<Share2 className="w-4 h-4" />} />
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+          <div className="lg:col-span-1 flex justify-center">
+            <div className="p-6 bg-surface rounded-3xl border border-edge shadow-soft">
+              <ReadinessRing score={report.score} size={140} label={report.status} />
+            </div>
+          </div>
+          <div className="lg:col-span-2">
+            <NextBestEditCard verdict={summary.verdict} nextBestEdit={summary.nextBestEdit} topFix={summary.topFix} />
+          </div>
+          <div className="lg:col-span-1">
+            <MetricCard label="Blocking Issues" value={report.criticalIssues.length} helper={summary.evaluatorRisk} accent={report.criticalIssues.length ? 'err' : 'ok'} icon={<Share2 className="w-4 h-4" />} />
+          </div>
         </div>
       </AnimatedSection>
 

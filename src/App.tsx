@@ -16,6 +16,8 @@ import ReviewsPage from './pages/ReviewsPage';
 import ReviewDetailPage from './pages/ReviewDetailPage';
 import MemoryPage from './pages/MemoryPage';
 import SettingsPage from './pages/SettingsPage';
+import SecuritySettingsPage from './pages/SecuritySettingsPage';
+import MfaChallengePage from './pages/MfaChallengePage';
 import WalkthroughPage from './pages/WalkthroughPage';
 
 export default function App() {
@@ -104,6 +106,14 @@ export default function App() {
               </MarketingLayout>
             } 
           />
+          <Route 
+            path="/mfa-challenge" 
+            element={
+              <MarketingLayout theme={theme} onThemeChange={handleThemeChange}>
+                <MfaChallengePage />
+              </MarketingLayout>
+            } 
+          />
 
           <Route
             path="/walkthrough"
@@ -127,6 +137,7 @@ export default function App() {
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/memory" element={<MemoryPage />} />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/settings/security" element={<SecuritySettingsPage />} />
           </Route>
         </Routes>
       </BrowserRouter>

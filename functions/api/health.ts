@@ -21,7 +21,11 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   return new Response(JSON.stringify({
     ok: true,
     providers: getProviderStatus(context.env),
-    supabaseServer,
+    supabase: {
+      frontendExpected: true,
+      server: supabaseServer,
+    },
+    authRequiredForAi: true,
     limits: LIMITS,
   }), {
     headers: { 'Content-Type': 'application/json' },

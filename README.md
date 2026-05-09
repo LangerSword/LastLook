@@ -2,7 +2,7 @@
 
 **The final check before you submit.**
 
-LastLook helps students applying to fellowships, hackathons, internships, startup programs, and grants. Save a lightweight personal memory, paste an application brief, generate tailored answers, and run a final pre-submit check — all in one flow.
+LastLook is a readiness workspace for completing important applications — fellowships, hackathons, internships, startup programs, and grants. Save a lightweight personal memory, paste an application brief, generate tailored answers, and run a final pre-submit check.
 
 > **New here?** Read the [WALKTHROUGH.md](WALKTHROUGH.md) for a step-by-step guide and 2-minute demo instructions.
 
@@ -16,10 +16,18 @@ Every competitive application gets rushed at the end. Students submit without ch
 - **Brief Analyzer** — Paste an application brief. Get explicit requirements, implied criteria, submission risks, and suggested answer angles.
 - **Answer Generator** — Generate tailored answers using your memory and brief analysis. Choose tone and target length.
 - **LastLook Checker** — Paste your final answer. Get a readiness score (0-100), critical issues, warnings, strong points, and a prioritized fix order.
+- **Full Application Builder** — Paste multiple questions, generate all answers, build a polished application packet.
+- **Application Packet** — Final output combining all answers, readiness score, requirements checklist, and submission readiness.
+- **Answer Library** — Save reusable snippets (personal intro, project descriptions, closing lines) for fast answer generation.
+- **Link Vault** — Store and manage your project links, GitHub, LinkedIn, portfolio, and more.
+- **Deadline Mode** — Get urgency-aware feedback based on time remaining.
+- **Smart Rewrite Controls** — Targeted rewriting (shorten, specialize, strengthen fit) without regenerating from scratch.
+- **Video Script Mode** — Convert answers into teleprompter-ready scripts with pacing cues.
+- **Security Features** — 2FA/MFA support, password strength enforcement, BYOK key storage in session only.
 - **Persistent Dashboard** — Integrated with Supabase Auth to save and review past submission checks across devices.
 - **Local Demo Mode** — Works without an account. Falls back to `localStorage` seamlessly.
-- **Robust AI Parsing** — Built-in frontend normalization guarantees structured UI components (no raw JSON text leaks).
-- **Mock Fallback** — Works without AI API keys for reliable demos.
+- **Robust AI Parsing** — Built-in frontend normalization guarantees structured UI (no raw JSON leaks).
+- **AI Provider Chain** — NVIDIA NIM → Cloudflare Workers AI → Mock fallback for demo reliability.
 
 ## Tech Stack
 
@@ -52,7 +60,7 @@ Set these in Cloudflare Pages dashboard under **Settings → Environment Variabl
 | `NVIDIA_MODEL` | No | `meta/llama-3.1-8b-instruct` | — |
 | `CLOUDFLARE_ACCOUNT_ID` | For CF AI | — | — |
 | `CLOUDFLARE_AI_TOKEN` | For CF AI | — | Treat as a **Secret** |
-| `CLOUDFLARE_AI_MODEL` | No | `@cf/meta/llama-3.1-8b-instruct` | — |
+| `CLOUDFLARE_AI_MODEL` | No | `@cf/meta/llama-3.1-8b-instruct-fp8-fast` | — |
 | `ADMIN_EMAILS` | No | — | Comma-separated list for quota overrides |
 
 **AI Binding:** If deploying on Cloudflare Pages with a Workers AI binding named `AI`, it will be used automatically (no REST credentials needed).
@@ -61,7 +69,7 @@ Set these in Cloudflare Pages dashboard under **Settings → Environment Variabl
 
 ## Supabase Authentication Setup
 
-LastLook uses Supabase to sync review sessions across devices.
+LastLook uses Supabase for authentication, data sync, and usage limits.
 
 Set these in your `.env.local`:
 ```env
@@ -69,13 +77,56 @@ VITE_SUPABASE_URL=your-project-url
 VITE_SUPABASE_ANON_KEY=your-anon-key
 ```
 
-**Redirect URLs:** In your Supabase Dashboard under **Authentication → URL Configuration**, set the Site URL and add these Redirect URLs so magic links and password resets work correctly:
-- Local: `http://localhost:5173/auth/callback` or `http://localhost:8788/auth/callback`
-- Local Reset: `http://localhost:5173/reset-password` or `http://localhost:8788/reset-password`
-- Production: `https://YOUR_DOMAIN/auth/callback`
-- Production Reset: `https://YOUR_DOMAIN/reset-password`
+### Redirect URLs
+In your Supabase Dashboard under **Authentication → URL Configuration**, set the Site URL and add these Redirect URLs:
+
+#### Auth Callback URLs
+- `http://localhost:5173/auth/callback`
+- `http://localhost:8788/auth/callback`
+- `https://YOUR_PAGES_URL.pages.dev/auth/callback`
+- `https://YOUR_CUSTOM_DOMAIN/auth/callback`
+
+#### Password Reset URLs
+- `http://localhost:5173/reset-password`
+- `http://localhost:8788/reset-password`
+- `https://YOUR_PAGES_URL.pages.dev/reset-password`
+- `https://YOUR_CUSTOM_DOMAIN/reset-password`
+
+#### MFA Challenge URLs
+- `http://localhost:5173/mfa-challenge`
+- `http://localhost:8788/mfa-challenge`
+- `https://YOUR_PAGES_URL.pages.dev/mfa-challenge`
+- `https://YOUR_CUSTOM_DOMAIN/mfa-challenge`
+
+### Security Notifications
+Configure email notifications for security events under **Authentication → Emails → Email Templates → Security Notifications**:
+- **Password changed** — sent when user updates their password
+- **Email address changed** — sent when user changes their email
+- **MFA method added** — sent when user enables 2FA/TOTP
+- **MFA method removed** — sent when user disables 2FA/TOTP
+
+Enable any or all of these to keep users informed of account security changes.
 
 See [SUPABASE_SETUP.md](SUPABASE_SETUP.md) for full database schema instructions.
+
+## Security
+
+LastLook takes security seriously:
+
+- **API Keys Never Stored** — BYOK keys are stored only in browser `sessionStorage`, never sent to LastLook servers, and cleared on sign out.
+- **MFA/2FA Support** — Users can enable TOTP authenticator-based 2FA via Settings → Security.
+- **Password Strength Enforcement** — All password forms enforce minimum strength (8+ chars, uppercase, lowercase, number, symbol, no common passwords).
+- **Security Notifications** — Supabase sends automatic email notifications for password changes, email changes, and MFA changes.
+- **Session Management** — Users can sign out everywhere and delete saved data.
+- **No Secrets in Code** — All API keys use environment variables, treated as secrets in Cloudflare Pages.
+
+## Review Limits
+
+To prevent abuse, LastLook enforces usage limits:
+- **5 full reviews per day** (analyze + generate + check pipeline)
+- **15 individual actions per day** (any single AI call)
+
+Authenticated users share these limits across devices. Admin emails bypass limits. Demo mode tracks limits locally.
 
 ## Cloudflare Pages Deployment
 
@@ -127,14 +178,15 @@ CLOUDFLARE_AI_MODEL=@cf/meta/llama-3.1-8b-instruct-fp8-fast
 - Resume parser — not the core value
 - File uploads — not needed for text-based applications
 - Chatbot interface — guided flow is more useful
+- PDF export — out of scope for launch
 
 ## Future Work
 
 - Export answers as formatted documents
-- History of past checks with score trends
 - Collaborative review (share a link for feedback)
 - More AI providers (OpenAI, Anthropic)
 - Browser extension for inline checking on application forms
+- Custom branded email templates for security notifications
 
 ## License
 
