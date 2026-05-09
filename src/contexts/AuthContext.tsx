@@ -8,6 +8,7 @@ import {
 } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { clearLocalMemoryOnly, getCloudMemorySnapshot, getLocalMemorySnapshot, saveMemory } from '../lib/memoryStore';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -105,6 +106,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(newSession.user);
         setIsDemoMode(false);
         localStorage.removeItem(DEMO_MODE_KEY);
+        void (async () => {
+          const localMemory = getLocalMemorySnapshot();
+          const cloudMemory = await getCloudMemorySnapshot(newSession.user.id);
+          if (localMemory && localMemory !== cloudMemory && !cloudMemory?.updatedAt) {
+            const shouldImport = window.confirm('Import local memory into your account?');
+            if (shouldImport) {
+              await saveMemory(localMemory);
+            }
+          }
+        })();
       } else if (_event === 'SIGNED_OUT') {
         setSession(null);
         setUser(null);
@@ -159,6 +170,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(async () => {
     localStorage.removeItem(DEMO_MODE_KEY);
     sessionStorage.removeItem('lastlook_byok');
+    const keepLocalCopy = window.confirm('Keep a local copy of your memory on this device?');
+    if (!keepLocalCopy) {
+      clearLocalMemoryOnly();
+    }
     setIsDemoMode(false);
     if (supabase) {
       await supabase.auth.signOut();

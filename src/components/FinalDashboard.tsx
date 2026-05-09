@@ -2,6 +2,7 @@ import { AlertOctagon, AlertTriangle, ShieldCheck, ListOrdered, FileText, Mic, C
 import type { FullRunResult } from '../lib/api';
 import { formatTime } from '../lib/utils';
 import { buildTailoredDashboardSummary, type DashboardSummary } from '../lib/dashboardSummary';
+import type { FullReviewPacket } from '../lib/types';
 import ScoreReveal from './motion/ScoreReveal';
 import XRayCard from './motion/XRayCard';
 
@@ -9,6 +10,7 @@ interface Props {
   result: FullRunResult;
   hideOverview?: boolean;
   summary?: DashboardSummary;
+  reviewPacket?: FullReviewPacket;
   showActions?: boolean;
   onSave?: () => void;
   onOpenDashboard?: () => void;
@@ -22,6 +24,7 @@ export default function FinalDashboard({
   result,
   hideOverview,
   summary,
+  reviewPacket,
   showActions,
   onSave,
   onOpenDashboard,
@@ -31,6 +34,7 @@ export default function FinalDashboard({
   canSave = true,
 }: Props) {
   const { readinessReport: report, briefAnalysis: brief } = result;
+  const answerText = (result.generatedAnswer.draft || '').toLowerCase();
 
   const sc = (s: number) => (s >= 80 ? 'text-ok' : s >= 60 ? 'text-warn' : 'text-err');
   const bc = (s: number) => (s >= 80 ? 'bg-ok' : s >= 60 ? 'bg-warn' : 'bg-err');
@@ -145,13 +149,14 @@ export default function FinalDashboard({
           <div className="rounded-2xl border border-edge bg-surface p-5 shadow-soft">
             <div className="flex items-center gap-2 mb-4">
               <ClipboardList className="w-4 h-4 text-ink" />
-              <h4 className="text-[13px] font-semibold text-ink">What the brief asked for</h4>
+              <h4 className="text-[13px] font-semibold text-ink">Requirement coverage</h4>
             </div>
             {brief.explicitRequirements.length > 0 ? (
               <ul className="space-y-2">
                 {brief.explicitRequirements.map((req, idx) => {
-                  // Simplistic check for demo purposes
-                  const needsAttention = report.criticalIssues.some(i => i.toLowerCase().includes(req.toLowerCase().split(' ')[0]));
+                  const key = req.toLowerCase().split(' ').find((word) => word.length > 3) || req.toLowerCase().split(' ')[0];
+                  const covered = answerText.includes(key);
+                  const needsAttention = !covered || report.criticalIssues.some((i) => i.toLowerCase().includes(key));
                   return (
                     <li key={idx} className="flex gap-2 text-[13px] text-ink-secondary items-start leading-relaxed">
                       {needsAttention ? (
@@ -222,6 +227,67 @@ export default function FinalDashboard({
           </div>
         </div>
       </div>
+
+      {reviewPacket && (
+        <div className="rounded-2xl border border-edge bg-surface p-5 shadow-soft space-y-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="font-mono text-[10px] text-ink-muted uppercase tracking-widest">application packet</div>
+              <h4 className="mt-2 text-[15px] font-semibold text-ink">Copy-ready summary for submission</h4>
+              <p className="mt-1 text-[13px] text-ink-secondary">This packet is built from the brief, your answer, and saved memory.</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => navigator.clipboard.writeText(reviewPacket.applicationPacket.exportMarkdown)}
+                className="inline-flex items-center gap-2 rounded-xl border border-edge bg-surface-muted px-3 py-2 text-[12px] font-medium text-ink"
+              >
+                <Copy className="w-3.5 h-3.5" /> Copy packet markdown
+              </button>
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="rounded-2xl border border-edge bg-surface-muted p-4">
+              <div className="text-[11px] font-mono uppercase tracking-widest text-ink-muted">Checklist</div>
+              <ul className="mt-3 space-y-2 text-[13px] text-ink-secondary">
+                {reviewPacket.applicationPacket.requirementChecklist.map((item) => (
+                  <li key={item.requirement} className="flex gap-2">
+                    <span className={`mt-1 h-2 w-2 rounded-full ${item.status === 'covered' ? 'bg-ok' : item.status === 'partial' ? 'bg-warn' : 'bg-err'}`} />
+                    <span>{item.requirement}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="rounded-2xl border border-edge bg-surface-muted p-4">
+              <div className="text-[11px] font-mono uppercase tracking-widest text-ink-muted">Required links</div>
+              <ul className="mt-3 space-y-2 text-[13px] text-ink-secondary">
+                {reviewPacket.applicationPacket.requiredLinks.length > 0 ? (
+                  reviewPacket.applicationPacket.requiredLinks.map((link) => (
+                    <li key={link} className="break-all">{link}</li>
+                  ))
+                ) : (
+                  <li>No required link detected yet.</li>
+                )}
+              </ul>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-edge bg-surface-muted p-4">
+            <div className="text-[11px] font-mono uppercase tracking-widest text-ink-muted">Submission checklist</div>
+            <ul className="mt-3 space-y-2 text-[13px] text-ink-secondary">
+              {reviewPacket.applicationPacket.submissionChecklist.map((item) => (
+                <li key={item}>- {item}</li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="rounded-2xl border border-edge bg-surface-muted p-4">
+            <div className="text-[11px] font-mono uppercase tracking-widest text-ink-muted">Export markdown</div>
+            <pre className="mt-3 overflow-x-auto whitespace-pre-wrap text-[12px] leading-relaxed text-ink-secondary">{reviewPacket.applicationPacket.exportMarkdown}</pre>
+          </div>
+        </div>
+      )}
 
       {showActions && !hideOverview && (
         <div className="flex flex-col gap-3 pt-6 border-t border-edge mt-6">

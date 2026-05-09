@@ -211,8 +211,8 @@ export default function DashboardPage() {
       <div className="relative z-10 max-w-6xl mx-auto">
         <AnimatedSection className="mb-8">
           <span className="font-mono text-[10px] text-ink-muted uppercase tracking-widest">readiness cockpit</span>
-          <h1 className="text-2xl font-semibold text-ink mt-2">Readiness Analytics</h1>
-          <p className="text-[14px] text-ink-secondary mt-1">Track your application quality, blockers, and momentum.</p>
+          <h1 className="text-[clamp(1.6rem,3.6vw,2.4rem)] font-extrabold text-ink mt-2 font-display">Readiness Analytics</h1>
+          <p className="text-[15px] text-ink-secondary mt-2 max-w-3xl">Track your application quality, blockers, and momentum — the command center for what you’ll fix before you hit submit.</p>
         </AnimatedSection>
 
         <AnimatedSection className="mb-8">

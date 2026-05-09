@@ -80,10 +80,12 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     const genPrompt = `Memory: ${JSON.stringify(body.memory || {})}
   Brief Analysis: ${JSON.stringify(briefAnalysis)}
   Question: ${body.question}
+  Program Name: ${body.programName || 'Unknown'}
   Application Type: ${body.applicationType || 'General'}
   Review Strictness: ${body.reviewStrictness || 'Balanced'}
   Tone: ${body.tone || 'Confident'}
   Target Length: ${body.targetLength || '150 words'}
+  Deadline: ${body.deadline || 'Not provided'}
 
   Generate a tailored answer draft.`;
 
@@ -115,8 +117,10 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     const checkPrompt = `Brief Analysis: ${JSON.stringify(briefAnalysis)}
   Question: ${body.question}
   Target: ${body.target || 'general'}
+  Program Name: ${body.programName || 'Unknown'}
   Application Type: ${body.applicationType || 'General'}
   Review Strictness: ${body.reviewStrictness || 'Balanced'}
+  Deadline: ${body.deadline || 'Not provided'}
 
   Answer to review:
   ${finalAnswerText}

@@ -1,4 +1,4 @@
-import type { BriefAnalysis, CheckResult, GeneratedAnswer, UserMemory } from './types';
+import type { ApplicationMemory, BriefAnalysis, CheckResult, GeneratedAnswer } from './types';
 
 export interface DashboardSummary {
   verdict: string;
@@ -21,7 +21,7 @@ export interface DashboardSummary {
 }
 
 interface SummaryInput {
-  memory?: UserMemory | null;
+  memory?: ApplicationMemory | null;
   briefAnalysis: BriefAnalysis;
   generatedAnswer?: GeneratedAnswer | null;
   readinessReport: CheckResult;
@@ -57,15 +57,23 @@ export function buildTailoredDashboardSummary({
   const hasLink = /(https?:\/\/|www\.)/i.test(lowerAnswer);
   const usesNumbers = /\d/.test(answerText);
 
-  const projectNames = (memory?.projects || '')
-    .split(/\n|,/)
-    .map((p) => p.replace(/^[\-*\d.\s]+/, '').trim())
-    .filter((p) => p.length > 2);
-  const mentionedProjects = projectNames.filter((p) => lowerAnswer.includes(p.toLowerCase()));
-  const explainedProjects = mentionedProjects.filter((p) => {
-    const pattern = new RegExp(`${p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}.*(built|shipped|launched|users|revenue|impact|metrics|results)`, 'i');
-    return pattern.test(answerText);
+  const projectNames = (memory?.projects || []).map((project) => project.name).filter(Boolean);
+  const mentionedProjects = projectNames.filter((projectName) => lowerAnswer.includes(projectName.toLowerCase()));
+  const explainedProjects = mentionedProjects.filter((projectName) => {
+    const project = memory?.projects.find((item) => item.name.toLowerCase() === projectName.toLowerCase());
+    if (!project) return false;
+    const explanationNeedles = [project.oneLiner, project.longerExplanation, project.bestUseCase].filter(Boolean);
+    return explanationNeedles.some((needle) => needle && lowerAnswer.includes(needle.toLowerCase().slice(0, 24)));
   });
+
+  const requiredLinks = [
+    memory?.linkVault.github,
+    memory?.linkVault.linkedin,
+    memory?.linkVault.portfolio,
+    memory?.linkVault.resume,
+    memory?.linkVault.demoVideo,
+    ...(memory?.linkVault.projectLinks || []),
+  ].filter(Boolean) as string[];
 
   let verdict = 'Promising, but not ready yet.';
   if (score >= 85) verdict = 'Ready with minor polish.';
@@ -80,6 +88,10 @@ export function buildTailoredDashboardSummary({
     topFix = 'Add the required public link before changing wording.';
     nextBestEdit = 'Place the link near the first sentence so evaluators do not miss it.';
     evaluatorRisk = 'Missing a required link can disqualify the submission.';
+  } else if (requiresLink && requiredLinks.length > 0 && !requiredLinks.some((link) => answerText.includes(link))) {
+    topFix = 'Move the saved link into the answer so the evaluator can open it immediately.';
+    nextBestEdit = 'Insert the saved public link from memory right after the opening sentence.';
+    evaluatorRisk = 'A saved link that is not surfaced in the answer still reads as missing.';
   } else if (requiresVideo && speakingSeconds < 60) {
     topFix = 'This is likely too short for a 60-90 second intro. Add one concrete example.';
     nextBestEdit = 'Add a single sentence about impact or a result to reach the target length.';
@@ -108,10 +120,10 @@ export function buildTailoredDashboardSummary({
   const avgSentence = sentences.length ? wordCount / sentences.length : wordCount;
 
   const completeness = clamp(
-    100 - critical.length * 16 - (requiresLink && !hasLink ? 20 : 0)
+    100 - critical.length * 16 - (requiresLink && !hasLink ? 20 : 0) - (requiresLink && requiredLinks.length > 0 && !requiredLinks.some((link) => answerText.includes(link)) ? 10 : 0)
   );
   const specificity = clamp(
-    100 - warnings.length * 12 - (usesNumbers ? 0 : 10) - (mentionedProjects.length > explainedProjects.length ? 8 : 0)
+    100 - warnings.length * 12 - (usesNumbers ? 0 : 10) - (mentionedProjects.length > explainedProjects.length ? 12 : 0)
   );
   const clarityBase = avgSentence > 24 ? 55 : avgSentence > 18 ? 70 : 85;
   const clarity = clamp(clarityBase + (score >= 80 ? 6 : 0) - warnings.length * 2);

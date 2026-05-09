@@ -9,6 +9,64 @@ export interface UserMemory {
   tone: string;
 }
 
+export interface MemoryProfile {
+  name: string;
+  shortBio: string;
+  currentFocus: string;
+  preferredTone: string;
+  locationTimezone?: string;
+}
+
+export interface MemoryProject {
+  name: string;
+  oneLiner: string;
+  longerExplanation: string;
+  tags: string[];
+  links: string[];
+  proof: string;
+  bestUseCase: string;
+}
+
+export interface MemoryAchievement {
+  title: string;
+  description: string;
+  proof: string;
+  category: string;
+}
+
+export interface AnswerLibrarySnippet {
+  title: string;
+  body: string;
+  tags: string[];
+}
+
+export interface LinkVault {
+  github: string;
+  linkedin: string;
+  portfolio: string;
+  resume: string;
+  demoVideo: string;
+  projectLinks: string[];
+  otherLinks: string[];
+}
+
+export interface MemoryPreferences {
+  preferredTone: string;
+  preferredApplicationTypes: ApplicationType[];
+  timezone?: string;
+  notes?: string;
+}
+
+export interface ApplicationMemory {
+  profile: MemoryProfile;
+  projects: MemoryProject[];
+  achievements: MemoryAchievement[];
+  answerLibrary: AnswerLibrarySnippet[];
+  linkVault: LinkVault;
+  preferences: MemoryPreferences;
+  updatedAt?: string;
+}
+
 export interface BriefAnalysis {
   explicitRequirements: string[];
   impliedCriteria: string[];
@@ -68,4 +126,99 @@ export interface RequirementCoverageItem {
   requirement: string;
   status: 'covered' | 'partial' | 'missing';
   note: string;
+}
+
+export interface ReviewerPanelItem {
+  score: number;
+  verdict: string;
+  specificFindings: string[];
+  fixes: string[];
+}
+
+export interface BriefAnalysisV2 {
+  summary: string;
+  explicitRequirements: string[];
+  hiddenRequirements: string[];
+  deliverables: string[];
+  requiredLinks: string[];
+  answerTopics: string[];
+  evaluationCriteria: string[];
+  deadlineConstraints: string[];
+  formatConstraints: string[];
+  submissionRisks: string[];
+}
+
+export interface EvidenceBank {
+  projects: string[];
+  achievements: string[];
+  links: string[];
+  personalAngles: string[];
+  reusableSnippets: string[];
+  answerSnippets: string[];
+}
+
+export interface NextBestEdit {
+  title: string;
+  reason: string;
+  suggestedText: string;
+}
+
+export interface FixPlanItem {
+  step: number;
+  title: string;
+  why: string;
+  effort: string;
+  impact: 'high' | 'medium' | 'low';
+  suggestedText: string;
+}
+
+export interface ImprovedAnswerVariant {
+  originalAnswer: string;
+  improvedAnswer: string;
+  whatChanged: string[];
+  whyItIsBetter: string[];
+  wordCount: number;
+  speakingTimeSeconds?: number;
+}
+
+export interface ApplicationPacket {
+  programName: string;
+  applicationType: ApplicationType;
+  overallScore: number;
+  status: string;
+  nextBestEdit: string;
+  finalAnswers: string[];
+  requirementChecklist: RequirementCoverageItem[];
+  requiredLinks: string[];
+  fixPlan: FixPlanItem[];
+  submissionChecklist: string[];
+  exportMarkdown: string;
+}
+
+export interface FullReviewPacket {
+  reviewId: string;
+  programName: string;
+  applicationType: ApplicationType;
+  deadlineMode: {
+    mode: 'careful' | 'fast' | 'emergency';
+    timeRemaining: string;
+    recommendation: string;
+  };
+  briefAnalysis: BriefAnalysisV2;
+  evidenceBank: EvidenceBank;
+  requirementCoverage: RequirementCoverageItem[];
+  reviewerPanel: {
+    requirements: ReviewerPanelItem;
+    fit: ReviewerPanelItem;
+    clarity: ReviewerPanelItem;
+    evidence: ReviewerPanelItem;
+    length: ReviewerPanelItem;
+    voice: ReviewerPanelItem;
+    risk: ReviewerPanelItem;
+  };
+  readinessReport: CheckResult;
+  nextBestEdit: NextBestEdit;
+  fixPlan: FixPlanItem[];
+  improvedApplication: ImprovedAnswerVariant;
+  applicationPacket: ApplicationPacket;
 }

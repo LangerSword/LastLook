@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Copy, RefreshCcw, Layers } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import type { BriefAnalysis, GeneratedAnswer, CheckResult, UserMemory, ApplicationType, ReviewStrictness } from '../lib/types';
+import type { BriefAnalysis, GeneratedAnswer, CheckResult, ApplicationMemory, ApplicationType, ReviewStrictness } from '../lib/types';
 import { buildTailoredDashboardSummary } from '../lib/dashboardSummary';
+import { buildFullReviewPacket } from '../lib/reviewEngine';
 import AnalysisLoader from './AnalysisLoader';
 import FinalDashboard from './FinalDashboard';
 import ResultCard from './ResultCard';
@@ -24,7 +25,8 @@ interface Props {
   loadingState: LoadingState | null;
   error: string | null;
   onReset: () => void;
-  memory?: UserMemory | null;
+  memory?: ApplicationMemory | null;
+  briefText?: string;
   question?: string;
   finalAnswer?: string;
   applicationType?: ApplicationType;
@@ -47,8 +49,13 @@ export default function ReviewStudio({
   error,
   onReset,
   memory,
+  briefText,
   question,
   finalAnswer,
+  applicationType,
+  reviewStrictness,
+  programName,
+  deadline,
   onSaveSession,
   openReviewPath,
   saveState = 'idle',
@@ -88,6 +95,21 @@ export default function ReviewStudio({
       finalAnswer,
     });
   }, [analysis, checkResult, generated, memory, question, finalAnswer]);
+
+  const reviewPacket = useMemo(() => {
+    if (!analysis || !checkResult) return null;
+    return buildFullReviewPacket({
+      briefAnalysis: analysis,
+      answer: finalAnswer || generated?.draft || '',
+      question: question || briefText || '',
+      memory,
+      applicationType: applicationType || 'Other',
+      reviewStrictness,
+      programName,
+      deadline,
+      generatedAnswer: generated,
+    });
+  }, [analysis, checkResult, generated, memory, question, finalAnswer, applicationType, reviewStrictness, programName, deadline, briefText]);
 
   const safeGenerated = generated || (finalAnswer ? { draft: finalAnswer, whyItWorks: [], customize: [] } : null);
   const coverage = summary?.fitSnapshot.completeness ?? 0;
@@ -174,6 +196,7 @@ export default function ReviewStudio({
               <FinalDashboard
                 result={{ briefAnalysis: analysis, generatedAnswer: safeGenerated, readinessReport: checkResult }}
                 summary={summary || undefined}
+                reviewPacket={reviewPacket || undefined}
                 showActions
                 onSave={onSaveSession}
                 onOpenDashboard={openReviewPath ? () => navigate(openReviewPath) : undefined}

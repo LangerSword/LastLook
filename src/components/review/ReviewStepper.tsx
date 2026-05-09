@@ -13,7 +13,7 @@ interface Props {
 export default function ReviewStepper({ steps, activeStep }: Props) {
   return (
     <div className="rounded-2xl border border-edge bg-surface p-4 sm:p-5 shadow-soft">
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
         {steps.map((step, idx) => {
           const isActive = idx === activeStep;
           const isDone = idx < activeStep;
@@ -32,8 +32,8 @@ export default function ReviewStepper({ steps, activeStep }: Props) {
                   {idx + 1}
                 </div>
               </div>
-              <div>
-                <div className={`text-[13px] font-semibold ${isActive ? 'text-ink' : 'text-ink-secondary'}`}>
+              <div className="min-w-0">
+                <div className={`text-[13px] font-semibold truncate ${isActive ? 'text-ink' : 'text-ink-secondary'}`}>
                   {step.title}
                 </div>
                 <div className="text-[12px] text-ink-muted">{step.description}</div>

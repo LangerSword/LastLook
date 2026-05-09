@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Filter, ArrowUpRight, Trash2 } from 'lucide-react';
+import { Search, Filter, ArrowUpRight, Trash2, FileText, Zap } from 'lucide-react';
 import { deleteReviewSession, getReviewSessions, type ReviewSession } from '../lib/reviewStore';
 import AnimatedSection from '../components/motion/AnimatedSection';
 
@@ -93,8 +93,17 @@ export default function ReviewsPage() {
       </div>
 
       {filtered.length === 0 ? (
-        <div className="rounded-3xl border border-edge bg-surface p-10 text-center text-ink-secondary">
-          No reviews yet. Run a new review to populate this list.
+        <div className="card p-12 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-[var(--surface-2)] border border-edge flex items-center justify-center mx-auto mb-4">
+            <FileText className="w-7 h-7 text-ink-muted" />
+          </div>
+          <h3 className="text-[18px] font-bold text-ink mb-2">No reviews yet</h3>
+          <p className="text-[14px] text-ink-secondary mb-6 max-w-sm mx-auto">
+            Run your first LastLook review to see it here. Every review gets a readiness score and a fix plan.
+          </p>
+          <button onClick={() => navigate('/app')} className="btn-primary text-[14px] px-5 py-2.5">
+            <Zap className="w-4 h-4" /> Start a review
+          </button>
         </div>
       ) : (
         <div className="grid gap-4">
@@ -102,34 +111,39 @@ export default function ReviewsPage() {
             const score = session.readinessReport?.score || 0;
             const status = statusFromScore(score);
             return (
-              <div key={session.id} className="rounded-3xl border border-edge bg-surface p-5 shadow-soft">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                  <div>
-                    <div className="text-[11px] text-ink-muted">{new Date(session.createdAt).toLocaleDateString()}</div>
-                    <div className="text-[16px] font-semibold text-ink mt-1">{session.title}</div>
-                    <div className="text-[12px] text-ink-secondary mt-1 max-w-[520px]">{session.question || 'No question saved.'}</div>
-                    <div className="text-[12px] text-ink-muted mt-2">
-                      {session.dashboardSummary?.applicationType || session.applicationType || 'Other'}
+              <div key={session.id} className="card p-5 group">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-[11px] text-ink-muted">{new Date(session.createdAt).toLocaleDateString()}</span>
+                      <span className="text-[11px] text-ink-muted">·</span>
+                      <span className="text-[11px] text-ink-muted">
+                        {session.dashboardSummary?.applicationType || session.applicationType || 'Other'}
+                      </span>
                     </div>
+                    <div className="text-[16px] font-bold text-ink font-headline">{session.title}</div>
+                    <div className="text-[13px] text-ink-secondary mt-1 truncate max-w-xl">{session.question || 'No question saved.'}</div>
                   </div>
-                  <div className="flex flex-wrap items-center gap-3">
-                    <span className={`inline-flex text-[11px] font-medium px-2 py-0.5 rounded-full ${
-                      status.tone === 'ok' ? 'bg-ok-soft text-ok' : status.tone === 'warn' ? 'bg-warn-soft text-warn' : 'bg-err-soft text-err'
-                    }`}>
-                      {status.label}
-                    </span>
-                    <span className="text-[15px] font-semibold text-ink">{score}</span>
-                    <button onClick={() => openSession(session)} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-yc text-[var(--button-text)] text-[12px] font-semibold">
+                  <div className="flex flex-wrap items-center gap-3 flex-shrink-0">
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-flex text-[11px] font-semibold px-2.5 py-1 rounded-full ${
+                        status.tone === 'ok' ? 'bg-ok-soft text-ok' : status.tone === 'warn' ? 'bg-warn-soft text-warn' : 'bg-err-soft text-err'
+                      }`}>
+                        {status.label}
+                      </span>
+                      <span className="text-[20px] font-bold text-ink font-headline">{score}</span>
+                    </div>
+                    <button onClick={() => openSession(session)} className="btn-primary text-[12px] px-3 py-2">
                       Open <ArrowUpRight className="w-3.5 h-3.5" />
                     </button>
-                    <button onClick={() => handleDelete(session)} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-edge text-ink-secondary hover:text-err">
-                      <Trash2 className="w-3.5 h-3.5" /> Delete
+                    <button onClick={() => handleDelete(session)} className="btn-ghost text-[12px] px-3 py-2 hover:text-err">
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
-                <div className="mt-4 rounded-2xl border border-edge bg-surface-muted p-4">
-                  <div className="text-[11px] font-mono text-ink-muted uppercase tracking-widest">Next best edit</div>
-                  <div className="text-[13px] text-ink-secondary mt-2">
+                <div className="mt-4 rounded-2xl border border-edge bg-[var(--surface-2)] p-4">
+                  <div className="text-[11px] font-mono text-ink-muted uppercase tracking-[0.14em] mb-1">Next best edit</div>
+                  <div className="text-[13px] text-ink-secondary">
                     {session.dashboardSummary?.nextBestEdit || session.dashboardSummary?.topFix || 'Add a program-specific line early.'}
                   </div>
                 </div>

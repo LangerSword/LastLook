@@ -1,10 +1,11 @@
-import type { BriefAnalysis, GeneratedAnswer, CheckResult } from './types';
+import type { BriefAnalysis, GeneratedAnswer, CheckResult, ApplicationMemory, ApplicationType, ReviewStrictness } from './types';
 import {
   normalizeAnalyzeResponse,
   normalizeGenerateResponse,
   normalizeCheckResponse,
 } from './parseAiResponse';
 import { supabase, isSupabaseConfigured } from './supabase';
+import { buildFullReviewPacket } from './reviewEngine';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 const API_BASE = `${API_BASE_URL}/api`;
@@ -102,14 +103,15 @@ export async function analyzeBrief(brief: string): Promise<BriefAnalysis> {
   if (isLocalDemoMode()) {
     return normalizeAnalyzeResponse({
       explicitRequirements: [
-        "60-90 second intro video",
-        "Tell about yourself and what you're building",
-        "Explain why the fellowship is a good fit"
+        '60-90 second intro video',
+        'Tell us about yourself and what you are building right now',
+        'Explain why this fellowship feels like a good fit',
+        'Ensure the link is publicly accessible'
       ],
-      impliedCriteria: ["Clarity of communication", "Genuine passion"],
-      submissionRisks: ["Video too short or too long"],
-      suggestedAngles: ["Lead with a concrete builder identity"],
-      summary: "This brief asks for a short video introduction. The evaluator wants to see who you are."
+      impliedCriteria: ['Clarity of communication', 'Builder identity', 'Specific fit', 'Public link accessibility'],
+      submissionRisks: ['Video too short for the time window', 'Project names without explanations', 'Missing public link'],
+      suggestedAngles: ['Lead with a concrete builder identity', 'Explain each project in one line', 'Connect your work to the fellowship'],
+      summary: 'This brief asks for a short public intro video that should sound specific, human, and easy to evaluate.'
     });
   }
   const data = await post('/analyze', { brief });
@@ -127,9 +129,9 @@ export async function generateAnswer(params: {
 }): Promise<GeneratedAnswer> {
   if (isLocalDemoMode()) {
     return normalizeGenerateResponse({
-      draft: "I'm a builder. I'm working on several projects that sit at the intersection of AI and systems.",
-      whyItWorks: ["Opens with a clear builder identity", "Projects are explained"],
-      customize: ["Add a specific fellowship program name"]
+      draft: "I’m Lakshaya, and I build practical AI and systems tools. Right now I’m working on Regenera, which reconstructs deleted data from traces, and AgentMesh, which helps AI agents use APIs and MCPs without brittle browser automation. This fellowship feels useful because I want sharper feedback from people who are already shipping ambitious products, and I want to keep building tools that solve real problems.",
+      whyItWorks: ['Opens with a clear builder identity', 'Explains the named projects', 'Connects the work to the fellowship'],
+      customize: ['Add the public link', 'Trim or expand to match the target time window']
     });
   }
   const data = await post('/generate', params);
@@ -148,12 +150,12 @@ export async function checkAnswer(params: {
 }): Promise<CheckResult> {
   if (isLocalDemoMode()) {
     return normalizeCheckResponse({
-      score: 42,
-      status: "Not ready",
-      criticalIssues: ["Too short for 60-90 second video"],
-      warnings: ["Weak builder identity"],
-      strongPoints: ["Mentions concrete project names"],
-      fixOrder: ["Expand to 145-220 words"]
+      score: 44,
+      status: 'Not ready',
+      criticalIssues: ['Missing the required public link', 'Regenera and AgentMesh are named but not explained'],
+      warnings: ['The fit line is generic instead of specific to this fellowship', 'The answer is too short for 60-90 seconds'],
+      strongPoints: ['Builder identity is clear', 'The answer references real projects'],
+      fixOrder: ['Add the public link', 'Explain AgentMesh in one sentence', 'Add one sentence showing why this fellowship fits the current work']
     }, params.wordCount, params.speakingTimeSeconds);
   }
   const data = await post('/check', params);
@@ -203,6 +205,8 @@ export async function runFullLastLook(
     target?: string;
     applicationType?: string;
     reviewStrictness?: string;
+    programName?: string;
+    deadline?: string;
   },
   onProgress?: (step: number) => void
 ): Promise<FullRunResult> {
@@ -212,14 +216,30 @@ export async function runFullLastLook(
     if (onProgress) onProgress(2);
     const generatedAnswer = await generateAnswer({ ...params, briefAnalysis });
     if (onProgress) onProgress(3);
-    const readinessReport = await checkAnswer({ 
-      ...params, 
-      target: params.target || 'general',
+    const finalAnswerText = params.finalAnswer || generatedAnswer.draft;
+    const wordCount = finalAnswerText.split(/\s+/).filter(Boolean).length;
+    const speakingTimeSeconds = Math.round((wordCount / 145) * 60);
+
+    // Use deterministic engine for tailored demo output
+    const packet = buildFullReviewPacket({
       briefAnalysis,
-      finalAnswer: params.finalAnswer || generatedAnswer.draft,
-      wordCount: 150,
-      speakingTimeSeconds: 60
+      answer: finalAnswerText,
+      question: params.question,
+      memory: params.memory as ApplicationMemory | null | undefined,
+      applicationType: (params.applicationType as ApplicationType) || 'Fellowship',
+      reviewStrictness: (params.reviewStrictness as ReviewStrictness) || 'Balanced',
+      programName: params.programName,
+      deadline: params.deadline,
+      generatedAnswer,
+      targetLength: params.targetLength,
     });
+
+    const readinessReport: CheckResult = {
+      ...packet.readinessReport,
+      wordCount,
+      speakingTimeSeconds,
+    };
+
     if (onProgress) onProgress(4);
     return { briefAnalysis, generatedAnswer, readinessReport };
   }

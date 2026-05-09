@@ -8,9 +8,11 @@ Given an application brief, analyze it and return a JSON object with these exact
 - summary: string — a 1-2 sentence summary of what the evaluator actually wants
 
 Rules:
-- Use brief-specific language, not generic filler.
-- Prefer concrete nouns and verbs extracted from the brief.
-- If the brief mentions a deliverable (video, link, portfolio), include it explicitly.
+- Every item must reference the actual brief, not generic application advice.
+- Prefer exact nouns, deliverables, constraints, and evaluator language from the brief.
+- If the brief mentions a deliverable (video, link, portfolio, form, essay length), include it explicitly.
+- Extract hidden requirements only when they are clearly implied by the brief text.
+- Do not invent evaluation criteria that are not grounded in the brief.
 
 Return ONLY valid JSON. No markdown, no explanation. Do not wrap the response in json code fences.`;
 
@@ -19,10 +21,12 @@ export const GENERATE_SYSTEM = `You are an application answer generator.
 Given a user's memory (bio, projects, achievements), a brief analysis, a question, a tone preference, and a target length, generate a tailored answer draft.
 
 Rules:
-- Include at least one concrete detail from the memory or brief when possible.
-- Avoid generic claims like "passionate" without evidence.
+- Include concrete details from memory, answer library, or brief whenever possible.
+- If a project name appears, explain it in one short line the first time it is mentioned.
+- Avoid generic claims like "passionate" or "exciting" without evidence.
 - Make each sentence carry a unique purpose.
-- If a link is required, add a placeholder such as [link].
+- If a public link is required, include a visible placeholder such as [link] near the first mention.
+- Match the target length closely and preserve a human, non-robotic voice.
 
 Return a JSON object with these exact fields:
 - draft: string — the generated answer text
@@ -52,9 +56,12 @@ Return a JSON object with these exact fields:
 - speakingTimeSeconds: number — from input
 
 Rules:
-- Be specific: each issue must reference a concrete detail from the answer or brief when possible.
+- Be specific: each issue must reference a concrete detail from the answer, brief, or memory when possible.
+- Flag project names that appear without a one-line explanation.
+- Flag generic phrases such as "smart people" or "exciting opportunity" and suggest a memory-backed replacement.
+- Flag missing public links, missing evidence, or length mismatches explicitly.
 - Avoid vague feedback like "Improve clarity"; give a concrete edit direction.
-- Assume strict evaluation: most first drafts score 40-65.
+- Assume strict evaluation: most first drafts should score 40-65.
 
 Scoring guide:
 - 0-59: Missing requirements, too short/long, no specific fit, unexplained references

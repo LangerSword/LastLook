@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Sparkles, Play, ChevronDown, Zap } from 'lucide-react';
-import type { UserMemory, BriefAnalysis, GeneratedAnswer, CheckResult, ToneOption, LengthOption, ApplicationType, ReviewStrictness } from '../lib/types';
-import { loadMemory, saveMemory } from '../lib/storage';
+import { Sparkles, Play, ChevronDown, Zap, Brain, FileText, ScanLine, Pencil } from 'lucide-react';
+import type { ApplicationMemory, BriefAnalysis, GeneratedAnswer, CheckResult, ToneOption, LengthOption, ApplicationType, ReviewStrictness } from '../lib/types';
+import { getMemory, saveMemory } from '../lib/memoryStore';
 import { sampleProfile, sampleBrief, sampleQuestion, sampleWeakAnswer } from '../lib/sampleData';
 import MemoryPanel from '../components/MemoryPanel';
 import BriefAnalyzer from '../components/BriefAnalyzer';
 import AnswerGenerator from '../components/AnswerGenerator';
 import LastLookChecker from '../components/LastLookChecker';
 import ReviewStudio, { type LoadingState } from '../components/ReviewStudio';
+import TweakLab from '../components/review/TweakLab';
 import { runFullLastLook } from '../lib/api';
 import { saveReviewSession, type ReviewSession } from '../lib/reviewStore';
 import { buildTailoredDashboardSummary } from '../lib/dashboardSummary';
@@ -18,7 +19,7 @@ import { useAuth } from '../contexts/AuthContext';
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
 export default function AppWorkspace() {
-  const [memory, setMemory] = useState<UserMemory | null>(null);
+  const [memory, setMemory] = useState<ApplicationMemory | null>(null);
   const [brief, setBrief] = useState('');
   const [analysis, setAnalysis] = useState<BriefAnalysis | null>(null);
   const [question, setQuestion] = useState('');
@@ -56,7 +57,12 @@ export default function AppWorkspace() {
   const isIndividualLimitHit = isAuthenticated && !isDemoMode && usage.individualActionsUsed >= 15;
   const limitMsg = "You’ve used today’s free review limit. You can still view saved reviews and edit drafts.";
 
-  useEffect(() => { const s = loadMemory(); if (s) setMemory(s); }, []);
+  useEffect(() => {
+    void (async () => {
+      const snapshot = await getMemory();
+      setMemory(snapshot.memory);
+    })();
+  }, []);
 
   useEffect(() => {
     const storedType = localStorage.getItem('lastlook_default_app_type');
@@ -87,14 +93,15 @@ export default function AppWorkspace() {
     }
   }, []);
 
-  const handleDemo = () => {
-    setMemory(sampleProfile); saveMemory(sampleProfile);
+  const handleDemo = async () => {
+    const saved = await saveMemory(sampleProfile);
+    setMemory(saved.memory);
     setBrief(sampleBrief); setQuestion(sampleQuestion); setFinalAnswer(sampleWeakAnswer);
     setProgramName('Founders Fellowship 2026');
     setApplicationType('Fellowship');
     setDeadline('');
     setStrictness('Balanced');
-    setAnalysis(null); setGenerated(null); setCheckResult(null); 
+    setAnalysis(null); setGenerated(null); setCheckResult(null);
     setLoadingState(null); setRunError(null);
     setSaveState('idle'); setSaveError(null);
     setLastSavedId(null);
@@ -139,6 +146,8 @@ export default function AppWorkspace() {
         finalAnswer,
         applicationType,
         reviewStrictness: strictness,
+        programName,
+        deadline,
       }, (step) => {
         const map = { 1: 1, 2: 3, 3: 5, 4: 6 } as Record<number, number>;
         setLoadingState({ active: true, stages, currentIdx: map[step] ?? 0 });
@@ -249,6 +258,23 @@ export default function AppWorkspace() {
     setSaveState('idle');
     setSaveError(null);
   };
+
+  const handleSaveSnippet = async (value: string) => {
+    if (!memory) return;
+    const updatedMemory = {
+      ...memory,
+      answerLibrary: [
+        ...memory.answerLibrary,
+        {
+          title: question.trim().slice(0, 60) || 'Saved answer snippet',
+          body: value,
+          tags: [applicationType.toLowerCase()],
+        },
+      ],
+    };
+    const saved = await saveMemory(updatedMemory);
+    setMemory(saved.memory);
+  };
   const handleGenerated = (g: GeneratedAnswer) => {
     setGenerated(g);
     if (!finalAnswer.trim()) setFinalAnswer(g.draft);
@@ -283,36 +309,49 @@ export default function AppWorkspace() {
     setSaveError(null);
   };
 
+  const activeStep = (() => {
+    if (checkResult) return 5;
+    if (loadingState?.active) return 4;
+    if (generated || finalAnswer.trim()) return 3;
+    if (brief.trim() || question.trim() || programName.trim()) return 1;
+    return 0;
+  })();
+
   return (
-    <div className="pb-20 pt-8 animate-fade-in">
+    <div className="pb-20 pt-6 animate-fade-in">
+      {/* ─── WORKSPACE HEADER ───────────────────────────────────── */}
       <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between mb-8 gap-6">
         <div>
           <div className="flex items-center gap-3 mb-3">
-            <span className="font-mono text-[10px] text-ink-muted uppercase tracking-widest">workspace</span>
+            <span className="font-mono text-[10px] text-ink-muted uppercase tracking-[0.14em]">application command center</span>
             {isAuthenticated && !isDemoMode && (
-              <span className="px-2 py-0.5 rounded-full bg-[var(--success-soft)] text-[var(--success)] text-[10px] font-semibold">
+              <span className="px-2 py-0.5 rounded-full bg-ok-soft text-ok text-[10px] font-semibold">
                 {usage.fullReviewsUsed}/5 reviews today
               </span>
             )}
           </div>
-          <h2 className="text-[clamp(1.6rem,2.8vw,2.2rem)] font-bold text-ink mt-2 font-headline">Build a decision-ready review.</h2>
+          <h2 className="text-[clamp(1.6rem,2.8vw,2.2rem)] font-bold text-ink mt-1 font-headline">
+            Build a decision-ready review.
+          </h2>
           <p className="text-[14px] text-ink-secondary mt-2 max-w-xl">
-            Configure the opportunity, tailor the review, and run the specialist reviewer panel.
+            Configure the opportunity, bring your memory, and run the specialist reviewer panel.
           </p>
         </div>
 
         <div className="flex items-center gap-3 p-1.5 bg-surface rounded-2xl border border-edge shadow-sm">
           <button
-            onClick={() => setRunMode('step')}
-            className={`px-4 py-2 text-[12px] font-semibold rounded-xl transition-all ${runMode === 'step' ? 'bg-[var(--accent)] text-white shadow-md' : 'text-ink-secondary hover:text-ink hover:bg-surface-muted'}`}
-          >
-            Step-by-step
-          </button>
-          <button
             onClick={() => setRunMode('full')}
             className={`px-4 py-2 text-[12px] font-semibold rounded-xl transition-all ${runMode === 'full' ? 'bg-[var(--accent)] text-white shadow-md' : 'text-ink-secondary hover:text-ink hover:bg-surface-muted'}`}
           >
-            Full LastLook
+            <Sparkles className="w-3.5 h-3.5 inline mr-1.5" />
+            Full Review
+          </button>
+          <button
+            onClick={() => setRunMode('step')}
+            className={`px-4 py-2 text-[12px] font-semibold rounded-xl transition-all ${runMode === 'step' ? 'bg-[var(--accent)] text-white shadow-md' : 'text-ink-secondary hover:text-ink hover:bg-surface-muted'}`}
+          >
+            <Play className="w-3.5 h-3.5 inline mr-1.5" />
+            Step-by-step
           </button>
           <div className="w-px h-6 bg-edge mx-1" />
           <button onClick={handleDemo} className="px-4 py-2 text-[12px] font-medium rounded-xl transition-colors text-ink-secondary hover:text-ink hover:bg-surface-muted">
@@ -321,197 +360,279 @@ export default function AppWorkspace() {
         </div>
       </div>
 
-      <ReviewStepper
-        activeStep={(() => {
-          if (checkResult) return 4;
-          if (loadingState?.active) return 3;
-          if (generated || finalAnswer.trim()) return 2;
-          if (brief.trim() || question.trim() || programName.trim()) return 1;
-          return 0;
-        })()}
-        steps={[
-          { title: 'Opportunity', description: 'Program, brief, deadline' },
-          { title: 'Answer', description: 'Draft or paste response' },
-          { title: 'Review Settings', description: 'Strictness + agents' },
-          { title: 'Run Review', description: 'Reviewer panel progress' },
-          { title: 'Result', description: 'Next best edit + actions' },
-        ]}
-      />
-      
-      <div className="rounded-3xl border border-edge bg-[var(--surface-muted)]/50 p-3 sm:p-5 shadow-soft">
-        <div className="grid gap-5 sm:gap-6 [grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr))]">
-          {/* Left Column: Inputs */}
-          <div className="space-y-5">
-            <div className="rounded-2xl border border-edge bg-surface p-5 shadow-card hover:shadow-card-hover transition-shadow">
-              <div className="flex items-center justify-between mb-4">
-                <span className="font-mono text-[10px] text-ink-muted uppercase tracking-widest">Opportunity</span>
-                <span className="w-6 h-6 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)] text-[10px] font-bold">1</span>
+      {/* ─── STEP PROGRESS ──────────────────────────────────────── */}
+      <div className="mb-8">
+        <ReviewStepper
+          activeStep={activeStep}
+          steps={[
+            { title: 'Opportunity', description: 'Program, brief, deadline' },
+            { title: 'Memory', description: 'Profile, projects, links' },
+            { title: 'Answer', description: 'Draft or paste response' },
+            { title: 'Review', description: 'Run the reviewer panel' },
+            { title: 'Results', description: 'Fix plan + next best edit' },
+            { title: 'Packet', description: 'Export and submit' },
+          ]}
+        />
+      </div>
+
+      {/* ─── MAIN WORKSPACE GRID ────────────────────────────────── */}
+      <div className="workspace-grid">
+        {/* Left Column: Application Builder (~60%) */}
+        <div className="space-y-6">
+          {/* Opportunity Card */}
+          <div className="card p-6">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <span className="font-mono text-[10px] text-ink-muted uppercase tracking-[0.14em]">Step 1</span>
+                <h3 className="text-[15px] font-bold text-ink mt-1">Opportunity Setup</h3>
               </div>
-              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <label className="text-[12px] text-ink-secondary">
-                  Program name
-                  <input
-                    value={programName}
-                    onChange={(e) => setProgramName(e.target.value)}
-                    placeholder="Founders Fellowship 2026"
-                    className="mt-2 w-full bg-surface-muted border border-edge rounded-xl px-3 py-2.5 text-[13px] text-ink"
-                  />
-                </label>
-                <label className="text-[12px] text-ink-secondary">
-                  Application type
-                  <div className="relative mt-2">
-                    <select
-                      value={applicationType}
-                      onChange={(e) => setApplicationType(e.target.value as ApplicationType)}
-                      className="w-full bg-surface-muted border border-edge rounded-xl px-3 py-2.5 text-[13px] text-ink"
-                    >
-                      {['Fellowship', 'Hackathon', 'Internship', 'Accelerator', 'Scholarship', 'Club/community', 'Grant', 'Other'].map((type) => (
-                        <option key={type} value={type}>{type}</option>
-                      ))}
-                    </select>
-                    <ChevronDown className="w-4 h-4 text-ink-muted absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                  </div>
-                </label>
-                <label className="text-[12px] text-ink-secondary">
-                  Deadline (optional)
-                  <input
-                    value={deadline}
-                    onChange={(e) => setDeadline(e.target.value)}
-                    type="date"
-                    className="mt-2 w-full bg-surface-muted border border-edge rounded-xl px-3 py-2.5 text-[13px] text-ink"
-                  />
-                </label>
+              <div className="w-8 h-8 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)]">
+                <Sparkles className="w-4 h-4" />
               </div>
             </div>
-
-            {runMode === 'full' && (
-              <div className="rounded-2xl border border-edge bg-gradient-to-br from-surface to-[var(--accent-soft)] p-5 shadow-card hover:shadow-card-hover transition-all mt-4">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-xl bg-[var(--accent)] flex items-center justify-center">
-                    <Sparkles className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <div className="text-[14px] font-semibold text-ink">Full LastLook</div>
-                    <div className="text-[11px] text-ink-muted">Run all 6 reviewer agents</div>
-                  </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <label className="text-[12px] text-ink-secondary">
+                Program name
+                <input
+                  value={programName}
+                  onChange={(e) => setProgramName(e.target.value)}
+                  placeholder="Founders Fellowship 2026"
+                  className="mt-2 w-full bg-[var(--surface-2)] border border-edge rounded-xl px-3 py-2.5 text-[13px] text-ink focus:border-[var(--accent)] focus:outline-none transition-colors"
+                />
+              </label>
+              <label className="text-[12px] text-ink-secondary">
+                Application type
+                <div className="relative mt-2">
+                  <select
+                    value={applicationType}
+                    onChange={(e) => setApplicationType(e.target.value as ApplicationType)}
+                    className="w-full bg-[var(--surface-2)] border border-edge rounded-xl px-3 py-2.5 text-[13px] text-ink appearance-none"
+                  >
+                    {['Fellowship', 'Hackathon', 'Internship', 'Accelerator', 'Scholarship', 'Club/community', 'Grant', 'Other'].map((type) => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="w-4 h-4 text-ink-muted absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 </div>
+              </label>
+              <label className="text-[12px] text-ink-secondary md:col-span-2">
+                Deadline (optional)
+                <input
+                  value={deadline}
+                  onChange={(e) => setDeadline(e.target.value)}
+                  type="date"
+                  className="mt-2 w-full md:w-1/2 bg-[var(--surface-2)] border border-edge rounded-xl px-3 py-2.5 text-[13px] text-ink focus:border-[var(--accent)] focus:outline-none transition-colors"
+                />
+              </label>
+            </div>
+          </div>
+
+          {/* Memory Card — First Class */}
+          <div className="card p-6 border-[var(--accent)]/20">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <span className="font-mono text-[10px] text-ink-muted uppercase tracking-[0.14em]">Step 2</span>
+                <h3 className="text-[15px] font-bold text-ink mt-1">Your Memory</h3>
+              </div>
+              <div className="w-8 h-8 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)]">
+                <Brain className="w-4 h-4" />
+              </div>
+            </div>
+            <p className="text-[13px] text-ink-secondary mb-4">
+              Save your profile, projects, achievements, and links. LastLook uses them to make feedback specific to you.
+            </p>
+            <MemoryPanel memory={memory} onMemoryChange={setMemory} />
+          </div>
+
+          {/* Brief + Question */}
+          <div className="card p-6">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <span className="font-mono text-[10px] text-ink-muted uppercase tracking-[0.14em]">Step 3</span>
+                <h3 className="text-[15px] font-bold text-ink mt-1">Brief & Answer</h3>
+              </div>
+              <div className="w-8 h-8 rounded-lg bg-[var(--surface-2)] border border-edge flex items-center justify-center text-ink-muted">
+                <FileText className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="space-y-5">
+              <BriefAnalyzer
+                brief={brief}
+                onBriefChange={handleBriefChange}
+                analysis={analysis}
+                onAnalysis={setAnalysis}
+                onStartLoading={() => setLoadingState({ active: true, stages: ['Requirement Reviewer is extracting the checklist'], currentIdx: 0 })}
+                onEndLoading={() => setLoadingState(null)}
+                disabled={isIndividualLimitHit}
+                disabledMessage={limitMsg}
+              />
+              <AnswerGenerator
+                memory={memory}
+                analysis={analysis}
+                question={question}
+                onQuestionChange={handleQuestionChange}
+                generated={generated}
+                onGenerated={handleGenerated}
+                tone={tone}
+                onToneChange={setTone}
+                targetLength={targetLength}
+                onLengthChange={setTargetLength}
+                applicationType={applicationType}
+                reviewStrictness={strictness}
+                onStartLoading={() => setLoadingState({ active: true, stages: ['Clarity Reviewer is checking structure', 'Length Reviewer is estimating word/time fit'], currentIdx: 0 })}
+                onEndLoading={() => setLoadingState(null)}
+                disabled={isIndividualLimitHit}
+                disabledMessage={limitMsg}
+              />
+            </div>
+          </div>
+
+          {/* Review Settings */}
+          <div className="card p-6">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <span className="font-mono text-[10px] text-ink-muted uppercase tracking-[0.14em]">Step 4</span>
+                <h3 className="text-[15px] font-bold text-ink mt-1">Review Settings</h3>
+              </div>
+              <div className="w-8 h-8 rounded-lg bg-[var(--surface-2)] border border-edge flex items-center justify-center text-ink-muted">
+                <ScanLine className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+              <label className="text-[12px] text-ink-secondary">
+                Review strictness
+                <div className="relative mt-2">
+                  <select
+                    value={strictness}
+                    onChange={(e) => setStrictness(e.target.value as ReviewStrictness)}
+                    className="w-full bg-[var(--surface-2)] border border-edge rounded-xl px-3 py-2.5 text-[13px] text-ink appearance-none"
+                  >
+                    {['Gentle', 'Balanced', 'Brutal'].map((level) => (
+                      <option key={level} value={level}>{level}</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="w-4 h-4 text-ink-muted absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+              </label>
+            </div>
+            <div>
+              <div className="text-[12px] text-ink-secondary mb-2">Reviewer agents</div>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { id: 'requirements', label: 'Requirement' },
+                  { id: 'fit', label: 'Fit' },
+                  { id: 'clarity', label: 'Clarity' },
+                  { id: 'evidence', label: 'Evidence' },
+                  { id: 'length', label: 'Length' },
+                  { id: 'voice', label: 'Voice' },
+                  { id: 'risk', label: 'Risk' },
+                ].map((agent) => (
+                  <button
+                    key={agent.id}
+                    onClick={() => toggleReviewer(agent.id)}
+                    className={`px-3 py-1.5 rounded-full border text-[12px] font-medium transition-colors ${
+                      selectedReviewers.includes(agent.id)
+                        ? 'bg-yc-soft text-yc border-yc/30'
+                        : 'bg-[var(--surface-2)] text-ink-secondary border-edge'
+                    }`}
+                  >
+                    {agent.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Final Answer Editor */}
+          <LastLookChecker
+            analysis={analysis}
+            question={question}
+            finalAnswer={finalAnswer}
+            onFinalAnswerChange={handleFinalAnswerChange}
+            result={checkResult}
+            onResultChange={handleCheckResultChange}
+            applicationType={applicationType}
+            reviewStrictness={strictness}
+            onStartLoading={() => setLoadingState({ active: true, stages: ['Risk Reviewer is finding blockers', 'Building readiness dashboard'], currentIdx: 0 })}
+            onEndLoading={() => setLoadingState(null)}
+            disabled={isIndividualLimitHit}
+            disabledMessage={limitMsg}
+          />
+
+          {/* Run CTA */}
+          <div className="card p-6 bg-gradient-to-br from-surface to-[var(--accent-soft)]/30 border-[var(--accent)]/20">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-[var(--accent)] flex items-center justify-center flex-shrink-0">
+                <Zap className="w-6 h-6 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-[16px] font-bold text-ink mb-1">Run Full LastLook</h3>
                 <p className="text-[13px] text-ink-secondary mb-4">
-                  Run the full reviewer panel in one pass when your brief and answer are ready.
+                  Run all reviewer agents in one pass when your brief and answer are ready.
                 </p>
-                {isFullReviewLimitHit && <div className="mb-4 p-3 rounded-xl bg-[var(--warning-soft)] text-[var(--warning)] text-[13px] border border-[var(--warning)]/20">{limitMsg}</div>}
-                <button onClick={handleRunFull} disabled={loadingState?.active || isFullReviewLimitHit} className="w-full flex justify-center items-center gap-2 px-5 py-3 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:bg-surface-muted disabled:text-ink-faint text-white text-[14px] font-semibold rounded-xl shadow-lg shadow-[var(--accent)]/20 hover:shadow-xl hover:shadow-[var(--accent)]/30 transition-all duration-200 cursor-pointer">
-                  <Zap className="w-4 h-4" /> {loadingState?.active ? 'Running full review...' : 'Run full LastLook'}
+                {isFullReviewLimitHit && (
+                  <div className="mb-4 p-3 rounded-xl bg-warn-soft text-warn text-[13px] border border-warn/20">{limitMsg}</div>
+                )}
+                <button
+                  onClick={handleRunFull}
+                  disabled={loadingState?.active || isFullReviewLimitHit}
+                  className="btn-primary text-[14px] px-6 py-3 disabled:opacity-50"
+                >
+                  <Zap className="w-4 h-4" />
+                  {loadingState?.active ? 'Running review panel...' : 'Run full LastLook'}
                 </button>
               </div>
-            )}
-            {runMode === 'step' && (
-              <div className="rounded-2xl border border-edge bg-surface p-5 shadow-sm mb-4">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="font-mono text-[10px] text-ink-muted uppercase tracking-widest">guided steps</span>
-                  <span className="text-[11px] text-ink-secondary">Run each step below</span>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    { id: 'brief-analyzer', label: 'Extract requirements' },
-                    { id: 'answer-generator', label: 'Draft answer' },
-                    { id: 'lastlook-checker', label: 'Check readiness' },
-                  ].map((step) => (
-                    <button
-                      key={step.id}
-                      onClick={() => document.getElementById(step.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-medium rounded-lg border border-edge bg-surface-muted text-ink-secondary hover:text-ink hover:bg-surface transition-all"
-                    >
-                      <Play className="w-3 h-3" /> {step.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-            <MemoryPanel memory={memory} onMemoryChange={setMemory} />
-            <BriefAnalyzer brief={brief} onBriefChange={handleBriefChange} analysis={analysis} onAnalysis={setAnalysis}
-              onStartLoading={() => setLoadingState({ active: true, stages: ['Requirement Reviewer is extracting the checklist'], currentIdx: 0 })}
-              onEndLoading={() => setLoadingState(null)} disabled={isIndividualLimitHit} disabledMessage={limitMsg} />
-            <AnswerGenerator memory={memory} analysis={analysis} question={question} onQuestionChange={handleQuestionChange}
-              generated={generated} onGenerated={handleGenerated} tone={tone} onToneChange={setTone} targetLength={targetLength} onLengthChange={setTargetLength}
-              applicationType={applicationType} reviewStrictness={strictness}
-              onStartLoading={() => setLoadingState({ active: true, stages: ['Clarity Reviewer is checking structure', 'Length Reviewer is estimating word/time fit'], currentIdx: 0 })}
-              onEndLoading={() => setLoadingState(null)} disabled={isIndividualLimitHit} disabledMessage={limitMsg} />
-
-            <div className="rounded-2xl border border-edge bg-surface p-5 shadow-sm">
-              <span className="font-mono text-[10px] text-ink-muted uppercase tracking-widest">3 / review settings</span>
-              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <label className="text-[12px] text-ink-secondary">
-                  Review strictness
-                  <div className="relative mt-2">
-                    <select
-                      value={strictness}
-                      onChange={(e) => setStrictness(e.target.value as ReviewStrictness)}
-                      className="w-full bg-surface-muted border border-edge rounded-xl px-3 py-2.5 text-[13px] text-ink"
-                    >
-                      {['Gentle', 'Balanced', 'Brutal'].map((level) => (
-                        <option key={level} value={level}>{level}</option>
-                      ))}
-                    </select>
-                    <ChevronDown className="w-4 h-4 text-ink-muted absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                  </div>
-                </label>
-              </div>
-              <div className="mt-4">
-                <div className="text-[12px] text-ink-secondary mb-2">Reviewer agents</div>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    { id: 'requirements', label: 'Requirement' },
-                    { id: 'fit', label: 'Fit' },
-                    { id: 'clarity', label: 'Clarity' },
-                    { id: 'length', label: 'Length' },
-                    { id: 'voice', label: 'Voice' },
-                    { id: 'risk', label: 'Risk' },
-                  ].map((agent) => (
-                    <button
-                      key={agent.id}
-                      onClick={() => toggleReviewer(agent.id)}
-                      className={`px-3 py-1.5 rounded-full border text-[12px] font-medium transition-colors ${
-                        selectedReviewers.includes(agent.id)
-                          ? 'bg-yc-soft text-yc border-yc/30'
-                          : 'bg-surface-muted text-ink-secondary border-edge'
-                      }`}
-                    >
-                      {agent.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
             </div>
+          </div>
+        </div>
 
-            <LastLookChecker analysis={analysis} question={question} finalAnswer={finalAnswer}
-              onFinalAnswerChange={handleFinalAnswerChange} result={checkResult} onResultChange={handleCheckResultChange}
-              applicationType={applicationType} reviewStrictness={strictness}
-              onStartLoading={() => setLoadingState({ active: true, stages: ['Risk Reviewer is finding blockers', 'Building readiness dashboard'], currentIdx: 0 })}
-              onEndLoading={() => setLoadingState(null)} disabled={isIndividualLimitHit} disabledMessage={limitMsg} />
-          </div>
-          
-          {/* Right Column: Review Studio */}
-          <div className="flex flex-col h-full lg:sticky lg:top-24">
-            <ReviewStudio 
-              analysis={analysis} 
-              generated={generated} 
-              checkResult={checkResult} 
-              loadingState={loadingState} 
-              error={runError} 
-              onReset={handleResetResults}
-              memory={memory}
-              question={question}
-              finalAnswer={finalAnswer}
-              applicationType={applicationType}
-              reviewStrictness={strictness}
-              programName={programName}
-              deadline={deadline}
-              openReviewPath={lastSavedId ? `/reviews/${lastSavedId}` : undefined}
-              onSaveSession={handleSaveSession}
-              saveState={saveState}
-              saveError={saveError}
-            />
-          </div>
+        {/* Right Column: Review Studio (~40%) */}
+        <div className="flex flex-col gap-5 lg:sticky lg:top-6 self-start">
+          <ReviewStudio
+            analysis={analysis}
+            generated={generated}
+            checkResult={checkResult}
+            loadingState={loadingState}
+            error={runError}
+            onReset={handleResetResults}
+            memory={memory}
+            briefText={brief}
+            question={question}
+            finalAnswer={finalAnswer}
+            applicationType={applicationType}
+            reviewStrictness={strictness}
+            programName={programName}
+            deadline={deadline}
+            openReviewPath={lastSavedId ? `/reviews/${lastSavedId}` : undefined}
+            onSaveSession={handleSaveSession}
+            saveState={saveState}
+            saveError={saveError}
+          />
+
+          {/* Tweak Lab — visually separate */}
+          {(analysis || generated || checkResult || finalAnswer.trim()) && (
+            <div className="card p-6 border-[var(--accent)]/10">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-8 h-8 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
+                  <Pencil className="w-4 h-4 text-[var(--accent)]" />
+                </div>
+                <div>
+                  <span className="font-mono text-[10px] text-ink-muted uppercase tracking-[0.14em]">Tweak Lab</span>
+                  <h3 className="text-[14px] font-bold text-ink">Targeted improvements</h3>
+                </div>
+              </div>
+              <TweakLab
+                memory={memory}
+                analysis={analysis}
+                question={question}
+                currentAnswer={finalAnswer || generated?.draft || ''}
+                applicationType={applicationType}
+                reviewStrictness={strictness}
+                onReplaceAnswer={handleFinalAnswerChange}
+                onSaveToLibrary={handleSaveSnippet}
+              />
+            </div>
+          )}
         </div>
       </div>
     </div>

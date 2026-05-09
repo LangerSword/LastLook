@@ -2,7 +2,7 @@
 
 **The final check before you submit.**
 
-LastLook is a readiness workspace for completing important applications — fellowships, hackathons, internships, startup programs, and grants. Save a lightweight personal memory, paste an application brief, generate tailored answers, and run a final pre-submit check.
+LastLook is a readiness workspace for completing important applications — fellowships, hackathons, internships, startup programs, and grants. Save structured memory, paste an application brief, generate tailored answers, run a deterministic pre-submit check, and then fine-tune the result in Tweak Lab.
 
 > **New here?** Read the [WALKTHROUGH.md](WALKTHROUGH.md) for a step-by-step guide and 2-minute demo instructions.
 
@@ -12,14 +12,15 @@ Every competitive application gets rushed at the end. Students submit without ch
 
 ## Features
 
-- **Memory Panel** — Save your bio, projects, achievements, and tone. Persisted in localStorage.
-- **Brief Analyzer** — Paste an application brief. Get explicit requirements, implied criteria, submission risks, and suggested answer angles.
+- **Memory Workspace** — Save structured profile data, projects, achievements, answer snippets, and link vault entries. Syncs to Supabase when signed in, with local fallback.
+- **Brief Analyzer** — Paste an application brief. Get explicit requirements, implied criteria, submission risks, and suggested answer angles grounded in the actual prompt.
 - **Answer Generator** — Generate tailored answers using your memory and brief analysis. Choose tone and target length.
 - **LastLook Checker** — Paste your final answer. Get a readiness score (0-100), critical issues, warnings, strong points, and a prioritized fix order.
 - **Full Application Builder** — Paste multiple questions, generate all answers, build a polished application packet.
 - **Application Packet** — Final output combining all answers, readiness score, requirements checklist, and submission readiness.
 - **Answer Library** — Save reusable snippets (personal intro, project descriptions, closing lines) for fast answer generation.
 - **Link Vault** — Store and manage your project links, GitHub, LinkedIn, portfolio, and more.
+- **Tweak Lab** — Strengthen fit, explain projects better, replace generic phrasing, and convert answers into video scripts.
 - **Deadline Mode** — Get urgency-aware feedback based on time remaining.
 - **Smart Rewrite Controls** — Targeted rewriting (shorten, specialize, strengthen fit) without regenerating from scratch.
 - **Video Script Mode** — Convert answers into teleprompter-ready scripts with pacing cues.

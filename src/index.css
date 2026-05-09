@@ -35,10 +35,16 @@
   /* Accent — warm orange */
   --accent: #FF5A1F;
   --accent-rgb: 255 90 31;
+  --accent-2: #FF7A3D;
+  --accent-2-rgb: 255 122 61;
   --accent-hover: #E5480F;
   --accent-hover-rgb: 229 72 15;
   --accent-soft: #FFF0EB;
+  --surface-2: #FFF8F2;
+  --surface-3: #FFF0E6;
   --button-text: #FFFFFF;
+  --shadow: rgba(23, 23, 23, 0.08);
+  --glow: rgba(255, 90, 31, 0.12);
 
   /* Status colors */
   --success: #16A34A;
@@ -100,10 +106,16 @@
   /* Accent — warm orange glow */
   --accent: #FF7A3D;
   --accent-rgb: 255 122 61;
+  --accent-2: #FF5A1F;
+  --accent-2-rgb: 255 90 31;
   --accent-hover: #FF5A1F;
   --accent-hover-rgb: 255 90 31;
   --accent-soft: rgba(255, 122, 61, 0.12);
+  --surface-2: #11131A;
+  --surface-3: #181D28;
   --button-text: #FFFFFF;
+  --shadow: rgba(0, 0, 0, 0.5);
+  --glow: rgba(255, 122, 61, 0.2);
 
   /* Status colors — slightly brighter for dark */
   --success: #22C55E;
@@ -481,14 +493,14 @@ select option { background: var(--surface); color: var(--text); }
 
 @media (min-width: 1024px) {
   .workspace-grid {
-    grid-template-columns: 1fr 420px;
-    gap: 24px;
+    grid-template-columns: 2fr 1fr; /* ~66% / 33% — roomy primary column */
+    gap: 28px;
   }
 }
 
 @media (min-width: 1280px) {
   .workspace-grid {
-    grid-template-columns: 1fr 480px;
+    grid-template-columns: 3fr 2fr; /* ~60% / 40% for desktop */
   }
 }
 

@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { Sparkles, AlertTriangle } from 'lucide-react';
-import type { UserMemory, BriefAnalysis, GeneratedAnswer, ToneOption, LengthOption, ApplicationType, ReviewStrictness } from '../lib/types';
+import type { ApplicationMemory, BriefAnalysis, GeneratedAnswer, ToneOption, LengthOption, ApplicationType, ReviewStrictness } from '../lib/types';
 import { generateAnswer } from '../lib/api';
 
 interface Props {
-  memory: UserMemory | null;
+  memory: ApplicationMemory | null;
   analysis: BriefAnalysis | null;
   question: string;
   onQuestionChange: (q: string) => void;
