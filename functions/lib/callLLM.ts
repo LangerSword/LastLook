@@ -22,7 +22,7 @@ export async function callLLM(
   messages: Message[],
   env: Env,
   options: LLMOptions = {}
-): Promise<string> {
+): Promise<{ content: string; provider: string; model: string }> {
   const { temperature = 0.7, maxTokens = 1024 } = options;
 
   // --- Provider 1: NVIDIA NIM ---
@@ -51,7 +51,7 @@ export async function callLLM(
         const content = data.choices?.[0]?.message?.content || '';
         if (content) {
           console.log('[callLLM] NVIDIA NIM responded successfully.');
-          return content;
+          return { content, provider: 'nvidia', model };
         }
       }
       console.error('[callLLM] NVIDIA NIM error:', res.status, await res.text().catch(() => ''));
@@ -74,7 +74,7 @@ export async function callLLM(
       const content = result?.response || result?.result?.response || '';
       if (content) {
         console.log('[callLLM] Cloudflare Workers AI (binding) responded successfully.');
-        return content;
+        return { content, provider: 'cloudflare_binding', model };
       }
     } catch (err) {
       console.error('[callLLM] Cloudflare Workers AI (binding) failed:', err);
@@ -89,7 +89,7 @@ export async function callLLM(
         const content = fallbackResult?.response || fallbackResult?.result?.response || '';
         if (content) {
           console.log('[callLLM] Cloudflare Workers AI secondary fallback (binding) responded successfully.');
-          return content;
+          return { content, provider: 'cloudflare_binding', model: fallbackModel };
         }
       } catch (fallbackErr) {
         console.error('[callLLM] Cloudflare Workers AI secondary fallback (binding) failed:', fallbackErr);
@@ -120,7 +120,7 @@ export async function callLLM(
         const content = data.result?.response || '';
         if (content) {
           console.log('[callLLM] Cloudflare Workers AI (REST) responded successfully.');
-          return content;
+          return { content, provider: 'cloudflare_rest', model };
         }
       } else {
         console.error('[callLLM] Cloudflare Workers AI (REST) error:', res.status, await res.text().catch(() => ''));
@@ -151,7 +151,7 @@ export async function callLLM(
           const content = data.result?.response || '';
           if (content) {
             console.log('[callLLM] Cloudflare Workers AI secondary fallback (REST) responded successfully.');
-            return content;
+            return { content, provider: 'cloudflare_rest', model: fallbackModel };
           }
         } else {
           console.error('[callLLM] Cloudflare Workers AI secondary fallback (REST) error:', res.status, await res.text().catch(() => ''));
@@ -164,7 +164,7 @@ export async function callLLM(
 
   // --- Provider 3: Mock fallback ---
   console.log('[callLLM] Using mock fallback.');
-  return mockLLM(messages);
+  return { content: mockLLM(messages), provider: 'mock', model: 'mock' };
 }
 
 /**

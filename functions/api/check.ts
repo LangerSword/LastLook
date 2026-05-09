@@ -9,10 +9,24 @@ interface Env {
   CLOUDFLARE_ACCOUNT_ID?: string;
   CLOUDFLARE_AI_MODEL?: string;
   AI?: any;
+  SUPABASE_URL?: string;
+  SUPABASE_ANON_KEY?: string;
+  ADMIN_EMAILS?: string;
 }
+
+import { verifyUser } from '../lib/auth';
+import { checkAndLogUsage } from '../lib/usage';
 
 export const onRequestPost: PagesFunction<Env> = async (context) => {
   try {
+    const user = await verifyUser(context.request, context.env);
+    if (!user) {
+      return new Response(JSON.stringify({
+        error: 'auth_required',
+        message: 'Sign in to run a real LastLook review. You can still try the sample demo.'
+      }), { status: 401, headers: { 'Content-Type': 'application/json' } });
+    }
+
     const body = await context.request.json() as any;
 
     if (!body.finalAnswer || typeof body.finalAnswer !== 'string') {
@@ -33,13 +47,18 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
   Evaluate this answer and return a score with detailed feedback.`;
 
-    const raw = await callLLM(
+    const { content: raw, provider, model } = await callLLM(
       [
         { role: 'system', content: CHECK_SYSTEM },
         { role: 'user', content: userMsg },
       ],
       context.env
     );
+
+    const usageErrorResponse = await checkAndLogUsage(user, 'check', context.env, provider, model);
+    if (usageErrorResponse) {
+      return usageErrorResponse;
+    }
 
     try {
       const cleanRaw = raw.replace(/^```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$/s, '$1').trim();

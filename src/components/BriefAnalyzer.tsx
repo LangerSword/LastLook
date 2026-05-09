@@ -10,9 +10,11 @@ interface Props {
   onAnalysis: (a: BriefAnalysis) => void;
   onStartLoading?: () => void;
   onEndLoading?: () => void;
+  disabled?: boolean;
+  disabledMessage?: string;
 }
 
-export default function BriefAnalyzer({ brief, onBriefChange, analysis, onAnalysis, onStartLoading, onEndLoading }: Props) {
+export default function BriefAnalyzer({ brief, onBriefChange, analysis, onAnalysis, onStartLoading, onEndLoading, disabled, disabledMessage }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,12 +42,13 @@ export default function BriefAnalyzer({ brief, onBriefChange, analysis, onAnalys
 
       {!brief.trim() && !analysis && <p className="text-[13px] text-ink-secondary mb-4">Paste a brief to extract the hidden checklist.</p>}
 
-      <button id="btn-analyze" onClick={run} disabled={loading || !brief.trim()}
+      <button id="btn-analyze" onClick={run} disabled={loading || !brief.trim() || disabled}
         className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-yc hover:bg-yc-hover disabled:bg-surface-muted disabled:text-ink-faint text-[var(--button-text)] text-[13px] font-semibold rounded-xl transition-all duration-200 shadow-sm shadow-yc/10 disabled:shadow-none disabled:border disabled:border-edge disabled:cursor-not-allowed cursor-pointer">
         {loading ? <><span className="w-4 h-4 border-2 border-[color:var(--button-text)]/30 border-t-[color:var(--button-text)] rounded-full animate-spin" /> Extracting...</>
           : <><Search className="w-4 h-4" /> Extract requirements</>}
       </button>
 
+      {disabled && disabledMessage && <div className="mt-4 p-3 rounded-xl bg-surface-muted text-ink-muted text-[13px] border border-edge">{disabledMessage}</div>}
       {error && <div className="mt-4 p-3 rounded-xl bg-err-soft text-err text-[13px] border border-err/20">{error}</div>}
 
       {analysis && <p className="mt-4 text-[13px] text-ink-secondary">Analysis ready. See the breakdown on the right.</p>}

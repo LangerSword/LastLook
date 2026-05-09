@@ -18,12 +18,14 @@ interface Props {
   reviewStrictness?: ReviewStrictness;
   onStartLoading?: () => void;
   onEndLoading?: () => void;
+  disabled?: boolean;
+  disabledMessage?: string;
 }
 
 const tones: ToneOption[] = ['Confident', 'Warm', 'Technical', 'Founder-like', 'Concise'];
 const lengths: LengthOption[] = ['100 words', '150 words', '200 words', '60-90 sec video'];
 
-export default function AnswerGenerator({ memory, analysis, question, onQuestionChange, generated, onGenerated, tone, onToneChange, targetLength, onLengthChange, applicationType, reviewStrictness, onStartLoading, onEndLoading }: Props) {
+export default function AnswerGenerator({ memory, analysis, question, onQuestionChange, generated, onGenerated, tone, onToneChange, targetLength, onLengthChange, applicationType, reviewStrictness, onStartLoading, onEndLoading, disabled, disabledMessage }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -79,12 +81,13 @@ export default function AnswerGenerator({ memory, analysis, question, onQuestion
 
       {!memory && <p className="mt-4 text-[13px] text-warn flex items-center gap-1.5"><AlertTriangle className="w-4 h-4" /> Save your memory first for personalized drafts.</p>}
 
-      <button id="btn-generate" onClick={run} disabled={loading || !question.trim()}
+      <button id="btn-generate" onClick={run} disabled={loading || !question.trim() || disabled}
         className="inline-flex items-center gap-1.5 mt-5 px-5 py-2.5 bg-yc hover:bg-yc-hover disabled:bg-surface-muted disabled:text-ink-faint text-[var(--button-text)] text-[13px] font-semibold rounded-xl transition-all duration-200 shadow-sm shadow-yc/10 disabled:shadow-none disabled:border disabled:border-edge disabled:cursor-not-allowed cursor-pointer">
         {loading ? <><span className="w-4 h-4 border-2 border-[color:var(--button-text)]/30 border-t-[color:var(--button-text)] rounded-full animate-spin" /> Drafting...</>
           : <><Sparkles className="w-4 h-4" /> Draft answer</>}
       </button>
 
+      {disabled && disabledMessage && <div className="mt-4 p-3 rounded-xl bg-surface-muted text-ink-muted text-[13px] border border-edge">{disabledMessage}</div>}
       {error && <div className="mt-4 p-3 rounded-xl bg-err-soft text-err text-[13px] border border-err/20">{error}</div>}
 
       {!generated && <p className="mt-4 text-[13px] text-ink-secondary">Draft an answer using your saved memory.</p>}

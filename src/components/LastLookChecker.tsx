@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ScanSearch, FileText, Mic } from 'lucide-react';
+import { ScanSearch, FileText, Mic, CheckCircle2 } from 'lucide-react';
 import type { BriefAnalysis, CheckResult, ApplicationType, ReviewStrictness } from '../lib/types';
 import { checkAnswer } from '../lib/api';
 import { wordCount, speakingTime, formatTime } from '../lib/utils';
@@ -15,9 +15,11 @@ interface Props {
   reviewStrictness?: ReviewStrictness;
   onStartLoading?: () => void;
   onEndLoading?: () => void;
+  disabled?: boolean;
+  disabledMessage?: string;
 }
 
-export default function LastLookChecker({ analysis, question, finalAnswer, onFinalAnswerChange, result, onResultChange, applicationType, reviewStrictness, onStartLoading, onEndLoading }: Props) {
+export default function LastLookChecker({ analysis, question, finalAnswer, onFinalAnswerChange, result, onResultChange, applicationType, reviewStrictness, onStartLoading, onEndLoading, disabled, disabledMessage }: Props) {
   const [target, setTarget] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -78,12 +80,13 @@ export default function LastLookChecker({ analysis, question, finalAnswer, onFin
 
       {!finalAnswer.trim() && !result && <p className="mt-4 text-[13px] text-ink-secondary">Run a final check to catch what you missed.</p>}
 
-      <button id="btn-check" onClick={run} disabled={loading || !finalAnswer.trim()}
+      <button id="btn-check" onClick={run} disabled={loading || !finalAnswer.trim() || disabled}
         className="inline-flex items-center gap-1.5 mt-5 px-5 py-2.5 bg-yc hover:bg-yc-hover disabled:bg-surface-muted disabled:text-ink-faint text-[var(--button-text)] text-[13px] font-semibold rounded-xl transition-all duration-200 shadow-sm shadow-yc/10 disabled:shadow-none disabled:border disabled:border-edge disabled:cursor-not-allowed cursor-pointer">
         {loading ? <><span className="w-4 h-4 border-2 border-[color:var(--button-text)]/30 border-t-[color:var(--button-text)] rounded-full animate-spin" /> Checking...</>
-          : <><ScanSearch className="w-4 h-4" /> Check readiness</>}
+          : <><CheckCircle2 className="w-4 h-4" /> Run readiness check</>}
       </button>
 
+      {disabled && disabledMessage && <div className="mt-4 p-3 rounded-xl bg-surface-muted text-ink-muted text-[13px] border border-edge">{disabledMessage}</div>}
       {error && <div className="mt-4 p-3 rounded-xl bg-err-soft text-err text-[13px] border border-err/20">{error}</div>}
 
       {result && <p className="mt-4 text-[13px] text-ink-secondary">Report ready. Review the readiness details on the right.</p>}

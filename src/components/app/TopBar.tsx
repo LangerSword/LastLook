@@ -5,6 +5,7 @@ import ThemeToggle from '../ThemeToggle';
 import type { Theme } from '../../lib/theme';
 import { useAuth } from '../../contexts/AuthContext';
 import { getHealth } from '../../lib/api';
+import { useUsage } from '../../hooks/useUsage';
 
 interface Props {
   theme: Theme;
@@ -16,6 +17,7 @@ type ProviderStatus = 'unknown' | 'healthy' | 'offline';
 export default function TopBar({ theme, onThemeChange }: Props) {
   const { user, isAuthenticated, isDemoMode, isSupabaseConfigured, signOut } = useAuth();
   const [providerStatus, setProviderStatus] = useState<ProviderStatus>('unknown');
+  const usage = useUsage();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -62,6 +64,16 @@ export default function TopBar({ theme, onThemeChange }: Props) {
     return null;
   };
 
+  const UsageBadge = () => {
+    if (!isAuthenticated || isDemoMode) return null;
+    const remaining = Math.max(0, 5 - usage.fullReviewsUsed);
+    return (
+      <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-edge bg-surface-muted text-[11px] font-mono text-ink-muted ml-2">
+        Reviews left today: {usage.loading ? '...' : `${remaining}/5`}
+      </span>
+    );
+  };
+
   return (
     <header className="sticky top-0 z-40 border-b border-edge bg-canvas/80 backdrop-blur-md">
       <div className="flex items-center justify-between px-4 sm:px-6 lg:px-8 h-16">
@@ -81,6 +93,7 @@ export default function TopBar({ theme, onThemeChange }: Props) {
 
         <div className="flex items-center gap-3">
           <ModeBadge />
+          <UsageBadge />
           <ThemeToggle value={theme} onChange={onThemeChange} />
 
           {isAuthenticated && user ? (

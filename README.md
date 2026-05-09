@@ -31,16 +31,29 @@ Every competitive application gets rushed at the end. Students submit without ch
 
 ## Environment Variables
 
-Set these in Cloudflare Pages dashboard under Settings → Environment Variables:
+LastLook uses two sets of environment variables: **Frontend Build Variables** and **Server Runtime Variables**.
 
-| Variable | Required | Default |
-|----------|----------|---------|
-| `NVIDIA_API_KEY` | For NVIDIA NIM | — |
-| `NVIDIA_BASE_URL` | No | `https://integrate.api.nvidia.com/v1` |
-| `NVIDIA_MODEL` | No | `meta/llama-3.1-8b-instruct` |
-| `CLOUDFLARE_ACCOUNT_ID` | For CF Workers AI (REST) | — |
-| `CLOUDFLARE_AI_TOKEN` | For CF Workers AI (REST) | — |
-| `CLOUDFLARE_AI_MODEL` | No | `@cf/meta/llama-3.1-8b-instruct` |
+### Frontend Build Variables
+Set these in your local `.env.local` or your build environment:
+```env
+VITE_SUPABASE_URL=your-project-url
+VITE_SUPABASE_ANON_KEY=your-anon-key
+```
+
+### Server Runtime Variables & Secrets
+Set these in Cloudflare Pages dashboard under **Settings → Environment Variables**:
+
+| Variable | Required | Default | Notes |
+|----------|----------|---------|-------|
+| `SUPABASE_URL` | For Quotas | — | Matches VITE_SUPABASE_URL |
+| `SUPABASE_ANON_KEY` | For Quotas | — | Matches VITE_SUPABASE_ANON_KEY |
+| `NVIDIA_API_KEY` | For NIM | — | Treat as a **Secret** |
+| `NVIDIA_BASE_URL` | No | `https://integrate.api.nvidia.com/v1` | — |
+| `NVIDIA_MODEL` | No | `meta/llama-3.1-8b-instruct` | — |
+| `CLOUDFLARE_ACCOUNT_ID` | For CF AI | — | — |
+| `CLOUDFLARE_AI_TOKEN` | For CF AI | — | Treat as a **Secret** |
+| `CLOUDFLARE_AI_MODEL` | No | `@cf/meta/llama-3.1-8b-instruct` | — |
+| `ADMIN_EMAILS` | No | — | Comma-separated list for quota overrides |
 
 **AI Binding:** If deploying on Cloudflare Pages with a Workers AI binding named `AI`, it will be used automatically (no REST credentials needed).
 
@@ -56,9 +69,11 @@ VITE_SUPABASE_URL=your-project-url
 VITE_SUPABASE_ANON_KEY=your-anon-key
 ```
 
-**Redirect URLs:** In your Supabase Dashboard under **Authentication → URL Configuration**, set the Site URL and add these Redirect URLs so magic links work correctly:
+**Redirect URLs:** In your Supabase Dashboard under **Authentication → URL Configuration**, set the Site URL and add these Redirect URLs so magic links and password resets work correctly:
 - Local: `http://localhost:5173/auth/callback` or `http://localhost:8788/auth/callback`
+- Local Reset: `http://localhost:5173/reset-password` or `http://localhost:8788/reset-password`
 - Production: `https://YOUR_DOMAIN/auth/callback`
+- Production Reset: `https://YOUR_DOMAIN/reset-password`
 
 See [SUPABASE_SETUP.md](SUPABASE_SETUP.md) for full database schema instructions.
 
@@ -95,6 +110,9 @@ Do not test API keys through `http://localhost:5173` unless Wrangler is also run
 Local Cloudflare Function secrets should go in `.dev.vars` (this file is gitignored):
 
 ```env
+SUPABASE_URL=your-project-url
+SUPABASE_ANON_KEY=your-anon-key
+ADMIN_EMAILS=your@email.com
 NVIDIA_API_KEY=your_key_here
 NVIDIA_BASE_URL=https://integrate.api.nvidia.com/v1
 NVIDIA_MODEL=meta/llama-3.1-8b-instruct

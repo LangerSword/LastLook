@@ -17,7 +17,9 @@ LastLook is a pre-submit checker for student applications — fellowships, hacka
 3. **Generate a tailored answer** — personalized to your profile
 4. **Run a final check** — readiness score, critical issues, fix order
 
-No login. No database. No setup friction. Open the URL and start.
+**Review Limits:** To prevent abuse, free authenticated users are limited to 5 full reviews or 15 individual actions per day. Unauthenticated users can only run the built-in sample demo.
+
+No login required for the demo. Open the URL and start.
 
 ---
 
@@ -48,6 +50,9 @@ Open `http://localhost:8788`. The app will use Cloudflare Pages local dev and yo
 Local environment variables should go in `.dev.vars` (this file is gitignored):
 
 ```env
+SUPABASE_URL=your-project-url
+SUPABASE_ANON_KEY=your-anon-key
+ADMIN_EMAILS=you@example.com
 NVIDIA_API_KEY=your_key_here
 NVIDIA_BASE_URL=https://integrate.api.nvidia.com/v1
 NVIDIA_MODEL=meta/llama-3.1-8b-instruct
@@ -157,6 +162,11 @@ curl https://your-domain/api/health
     "nvidia": "configured",
     "cloudflareWorkersAI": "missing",
     "mock": "available"
+  },
+  "supabaseServer": "configured",
+  "limits": {
+    "fullReviewsPerDay": 5,
+    "individualActionsPerDay": 15
   }
 }
 ```
@@ -180,6 +190,9 @@ The `functions/` directory is auto-detected for serverless API routes. No extra 
 
 | Variable | Purpose | Required? |
 |----------|---------|-----------|
+| `SUPABASE_URL` | User verification & quota | Yes (if tracking limits) |
+| `SUPABASE_ANON_KEY` | User verification & quota | Yes (if tracking limits) |
+| `ADMIN_EMAILS` | Override quotas | Optional |
 | `NVIDIA_API_KEY` | NVIDIA NIM API | Optional (Tier 1) |
 | `NVIDIA_BASE_URL` | Custom endpoint | No — default: `https://integrate.api.nvidia.com/v1` |
 | `NVIDIA_MODEL` | Model override | No — default: `meta/llama-3.1-8b-instruct` |
@@ -202,6 +215,10 @@ LastLook can run without a database (Demo Mode), but if you configure Supabase (
 - `http://localhost:5173/auth/callback`
 - `https://YOUR_DOMAIN/auth/callback`
 - `https://YOUR_PAGES_DEV_URL/auth/callback`
+- `http://localhost:8788/reset-password`
+- `http://localhost:5173/reset-password`
+- `https://YOUR_DOMAIN/reset-password`
+- `https://YOUR_PAGES_DEV_URL/reset-password`
 
 ---
 

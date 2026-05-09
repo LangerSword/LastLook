@@ -6,6 +6,7 @@ import { getHealth } from '../lib/api';
 import type { Theme } from '../lib/theme';
 import { useAuth } from '../contexts/AuthContext';
 import { applyTheme, initializeTheme, setStoredTheme } from '../lib/theme';
+import { useUsage } from '../hooks/useUsage';
 
 const IS_DEV = import.meta.env.DEV;
 
@@ -17,6 +18,7 @@ export default function SettingsPage() {
   const [debugOpen, setDebugOpen] = useState(false);
 
   const { user, session, isSupabaseConfigured, isAuthenticated, isDemoMode } = useAuth();
+  const usage = useUsage();
 
   useEffect(() => {
     getHealth()
@@ -146,6 +148,29 @@ export default function SettingsPage() {
             <AlertTriangle className="w-5 h-5 text-warn" />
           )}
         </div>
+        {/* Usage Stats */}
+        {isAuthenticated && !isDemoMode && (
+          <div className="rounded-2xl border border-edge bg-surface-muted p-4 space-y-2">
+            <div className="text-[13px] font-semibold text-ink">Usage & Limits (Free Beta)</div>
+            <div className="grid grid-cols-2 gap-4 mt-2">
+              <div>
+                <div className="text-[11px] text-ink-muted uppercase tracking-wider">Full Reviews</div>
+                <div className="text-[14px] text-ink font-mono mt-0.5">
+                  {usage.loading ? '...' : `${usage.fullReviewsUsed} / 5`}
+                </div>
+              </div>
+              <div>
+                <div className="text-[11px] text-ink-muted uppercase tracking-wider">Individual Actions</div>
+                <div className="text-[14px] text-ink font-mono mt-0.5">
+                  {usage.loading ? '...' : `${usage.individualActionsUsed} / 15`}
+                </div>
+              </div>
+            </div>
+            <div className="text-[11px] text-ink-secondary mt-2 border-t border-edge pt-2">
+              Limits reset daily at midnight UTC.
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Dev Debug Panel — development only */}

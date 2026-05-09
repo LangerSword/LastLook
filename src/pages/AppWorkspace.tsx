@@ -12,6 +12,8 @@ import { runFullLastLook } from '../lib/api';
 import { saveReviewSession, type ReviewSession } from '../lib/reviewStore';
 import { buildTailoredDashboardSummary } from '../lib/dashboardSummary';
 import ReviewStepper from '../components/review/ReviewStepper';
+import { useUsage } from '../hooks/useUsage';
+import { useAuth } from '../contexts/AuthContext';
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
@@ -46,6 +48,13 @@ export default function AppWorkspace() {
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [saveError, setSaveError] = useState<string | null>(null);
   const [lastSavedId, setLastSavedId] = useState<string | null>(null);
+
+  const usage = useUsage();
+  const { isAuthenticated, isDemoMode } = useAuth();
+  
+  const isFullReviewLimitHit = isAuthenticated && !isDemoMode && usage.fullReviewsUsed >= 5;
+  const isIndividualLimitHit = isAuthenticated && !isDemoMode && usage.individualActionsUsed >= 15;
+  const limitMsg = "You’ve used today’s free review limit. You can still view saved reviews and edit drafts.";
 
   useEffect(() => { const s = loadMemory(); if (s) setMemory(s); }, []);
 
@@ -369,7 +378,8 @@ export default function AppWorkspace() {
                 <p className="text-[13px] text-ink-secondary mb-4">
                   Run the full reviewer panel in one pass when your brief and answer are ready.
                 </p>
-                <button onClick={handleRunFull} disabled={loadingState?.active} className="w-full flex justify-center items-center gap-2 px-5 py-3 bg-yc hover:bg-yc-hover disabled:bg-surface-muted disabled:text-ink-faint text-canvas text-[14px] font-semibold rounded-xl shadow-sm transition-all duration-200 cursor-pointer">
+                {isFullReviewLimitHit && <div className="mb-4 p-3 rounded-xl bg-surface-muted text-ink-muted text-[13px] border border-edge">{limitMsg}</div>}
+                <button onClick={handleRunFull} disabled={loadingState?.active || isFullReviewLimitHit} className="w-full flex justify-center items-center gap-2 px-5 py-3 bg-yc hover:bg-yc-hover disabled:bg-surface-muted disabled:text-ink-faint text-canvas text-[14px] font-semibold rounded-xl shadow-sm transition-all duration-200 cursor-pointer">
                   <Sparkles className="w-4 h-4" /> {loadingState?.active ? 'Running...' : 'Run full LastLook'}
                 </button>
               </div>
@@ -400,12 +410,12 @@ export default function AppWorkspace() {
             <MemoryPanel memory={memory} onMemoryChange={setMemory} />
             <BriefAnalyzer brief={brief} onBriefChange={handleBriefChange} analysis={analysis} onAnalysis={setAnalysis}
               onStartLoading={() => setLoadingState({ active: true, stages: ['Requirement Reviewer is extracting the checklist'], currentIdx: 0 })}
-              onEndLoading={() => setLoadingState(null)} />
+              onEndLoading={() => setLoadingState(null)} disabled={isIndividualLimitHit} disabledMessage={limitMsg} />
             <AnswerGenerator memory={memory} analysis={analysis} question={question} onQuestionChange={handleQuestionChange}
               generated={generated} onGenerated={handleGenerated} tone={tone} onToneChange={setTone} targetLength={targetLength} onLengthChange={setTargetLength}
               applicationType={applicationType} reviewStrictness={strictness}
               onStartLoading={() => setLoadingState({ active: true, stages: ['Clarity Reviewer is checking structure', 'Length Reviewer is estimating word/time fit'], currentIdx: 0 })}
-              onEndLoading={() => setLoadingState(null)} />
+              onEndLoading={() => setLoadingState(null)} disabled={isIndividualLimitHit} disabledMessage={limitMsg} />
 
             <div className="rounded-2xl border border-edge bg-surface p-5 shadow-sm">
               <span className="font-mono text-[10px] text-ink-muted uppercase tracking-widest">3 / review settings</span>
@@ -457,7 +467,7 @@ export default function AppWorkspace() {
               onFinalAnswerChange={handleFinalAnswerChange} result={checkResult} onResultChange={handleCheckResultChange}
               applicationType={applicationType} reviewStrictness={strictness}
               onStartLoading={() => setLoadingState({ active: true, stages: ['Risk Reviewer is finding blockers', 'Building readiness dashboard'], currentIdx: 0 })}
-              onEndLoading={() => setLoadingState(null)} />
+              onEndLoading={() => setLoadingState(null)} disabled={isIndividualLimitHit} disabledMessage={limitMsg} />
           </div>
           
           {/* Right Column: Review Studio */}

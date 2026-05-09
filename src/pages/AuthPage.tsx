@@ -164,6 +164,17 @@ export default function AuthPage() {
                   minLength={6}
                 />
               </div>
+              {!isSignUp && (
+                <div className="mt-2 text-right">
+                  <button
+                    type="button"
+                    onClick={() => navigate('/forgot-password')}
+                    className="text-[12px] font-medium text-yc hover:text-yc-hover transition-colors"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
+              )}
             </div>
 
             <button
