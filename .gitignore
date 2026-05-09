@@ -1,0 +1,49 @@
+# dependencies
+node_modules/
+dist/
+
+# env
+.env
+.env.*
+.dev.vars
+.dev.vars.*
+.wrangler/
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# build
+*.tsbuildinfo
+
+# Agentic build workflow / local planning artifacts
+AGENTS.md
+SKILLS.md
+DEVLOG.md
+memory/
+design-system/
+
+# IDE/agent configs if not meant for public repo
+.cursor/
+.windsurf/
+.claude/
+.codex/
+.agent/*
+
+# Secrets / local env
+.env
+.env.*
+.dev.vars
+.dev.vars.*
+
+# Build/dependency output
+node_modules/
+dist/
+.wrangler/
+.cache/

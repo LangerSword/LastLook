@@ -1,0 +1,162 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+  --bg: #FDF7ED;
+  --bg-rgb: 253 247 237;
+  --surface: #FFFFFF;
+  --surface-rgb: 255 255 255;
+  --surface-muted: #FFF4E6;
+  --surface-muted-rgb: 255 244 230;
+  --text: #171717;
+  --text-rgb: 23 23 23;
+  --text-muted: #5F5A52;
+  --text-muted-rgb: 95 90 82;
+  --text-soft: #8A8175;
+  --text-soft-rgb: 138 129 117;
+  --text-faint: #C4BEB5;
+  --text-faint-rgb: 196 190 181;
+  --border: #E7D7C1;
+  --accent: #FF5A1F;
+  --accent-rgb: 255 90 31;
+  --accent-hover: #E5480F;
+  --accent-hover-rgb: 229 72 15;
+  --button-text: #FFFFFF;
+  --success: #16A34A;
+  --success-rgb: 22 163 74;
+  --warning: #D97706;
+  --warning-rgb: 217 119 6;
+  --danger: #DC2626;
+  --danger-rgb: 220 38 38;
+  --shadow: rgba(23, 23, 23, 0.08);
+  --select-icon: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235F5A52' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #080B12;
+  --bg-rgb: 8 11 18;
+  --surface: #101622;
+  --surface-rgb: 16 22 34;
+  --surface-muted: #151D2C;
+  --surface-muted-rgb: 21 29 44;
+  --text: #F8FAFC;
+  --text-rgb: 248 250 252;
+  --text-muted: #CBD5E1;
+  --text-muted-rgb: 203 213 225;
+  --text-soft: #94A3B8;
+  --text-soft-rgb: 148 163 184;
+  --text-faint: #64748B;
+  --text-faint-rgb: 100 116 139;
+  --border: rgba(255, 255, 255, 0.14);
+  --accent: #FF7A3D;
+  --accent-rgb: 255 122 61;
+  --accent-hover: #FF5A1F;
+  --accent-hover-rgb: 255 90 31;
+  --button-text: #FFFFFF;
+  --success: #16A34A;
+  --success-rgb: 22 163 74;
+  --warning: #D97706;
+  --warning-rgb: 217 119 6;
+  --danger: #DC2626;
+  --danger-rgb: 220 38 38;
+  --shadow: rgba(0, 0, 0, 0.35);
+  --select-icon: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23CBD5E1' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-behavior: smooth; background-color: var(--bg); }
+
+body {
+  margin: 0; padding: 0;
+  font-family: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+  background-color: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: -20% 0 auto 0;
+  height: 60vh;
+  background: radial-gradient(60% 60% at 50% 0%, rgb(var(--accent-rgb) / 0.18), transparent 70%);
+  pointer-events: none;
+  z-index: -1;
+}
+
+[data-theme="dark"] body::before {
+  background: radial-gradient(70% 70% at 50% 0%, rgb(var(--accent-rgb) / 0.16), transparent 72%);
+}
+
+.spectra-noise {
+  background-image:
+    radial-gradient(60% 60% at 15% 10%, rgb(var(--accent-rgb) / 0.22), transparent 60%),
+    radial-gradient(55% 55% at 85% 0%, rgb(var(--accent-rgb) / 0.12), transparent 58%),
+    radial-gradient(50% 50% at 50% 90%, rgba(255, 200, 150, 0.16), transparent 60%),
+    radial-gradient(rgb(var(--text-rgb) / 0.08) 0.5px, transparent 0.5px);
+  background-size: auto, auto, auto, 6px 6px;
+  background-position: center, center, center, 0 0;
+  opacity: 0.75;
+  animation: spectraShift 18s ease-in-out infinite;
+}
+
+[data-theme="dark"] .spectra-noise {
+  background-image:
+    radial-gradient(60% 60% at 15% 10%, rgba(12, 30, 65, 0.8), transparent 60%),
+    radial-gradient(55% 55% at 85% 0%, rgb(var(--accent-rgb) / 0.18), transparent 60%),
+    radial-gradient(50% 50% at 50% 90%, rgba(6, 10, 20, 0.75), transparent 60%),
+    radial-gradient(rgba(255, 255, 255, 0.08) 0.5px, transparent 0.5px);
+  opacity: 0.55;
+}
+
+@keyframes spectraShift {
+  0% {
+    background-position: 0% 0%, 100% 0%, 50% 100%, 0 0;
+  }
+  50% {
+    background-position: 10% 10%, 90% 5%, 50% 85%, 3px 3px;
+  }
+  100% {
+    background-position: 0% 0%, 100% 0%, 50% 100%, 0 0;
+  }
+}
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgb(var(--text-muted-rgb) / 0.6); }
+
+::selection { background: rgb(var(--accent-rgb) / 0.18); color: var(--text); }
+
+*:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+select {
+  appearance: none;
+  background-image: var(--select-icon);
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 1em;
+  padding-right: 2.5rem;
+}
+select option { background: var(--surface); color: var(--text); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .spectra-noise {
+    animation: none;
+  }
+}
