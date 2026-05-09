@@ -9,7 +9,8 @@
     "preview": "npm run build && wrangler dev",
     "pages:dev": "npm run build && npx wrangler@latest pages dev dist --port 8788 --ai AI --env-file .dev.vars",
     "pages:deploy": "npm run build && npx wrangler@latest pages deploy dist",
-    "deploy": "npm run build && wrangler deploy"
+    "deploy": "npm run build && wrangler deploy",
+    "simulate:review": "tsx src/engine/simulation/runSimulation.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.4",
@@ -28,6 +29,7 @@
     "autoprefixer": "^10.4.21",
     "postcss": "^8.5.3",
     "tailwindcss": "^3.4.17",
+    "tsx": "^4.21.0",
     "typescript": "~5.7.2",
     "vite": "^6.3.5",
     "wrangler": "^4.90.0"
