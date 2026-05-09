@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { Sparkles, Play, ChevronDown, Zap, Brain, FileText, ScanLine, Pencil, ArrowRight, ClipboardCheck, Package, Layout, Terminal } from 'lucide-react';
 import { Sparkles, Play, ChevronDown, Zap, Brain, FileText, ScanLine, Pencil, ArrowRight, ClipboardCheck, Package, Layout, Terminal, CheckCircle2 } from 'lucide-react';
 import type { ApplicationMemory, BriefAnalysis, GeneratedAnswer, CheckResult, ToneOption, LengthOption, ApplicationType, ReviewStrictness } from '../lib/types';
 import { getMemory, saveMemory } from '../lib/memoryStore';
