@@ -16,14 +16,17 @@ Every competitive application gets rushed at the end. Students submit without ch
 - **Brief Analyzer** — Paste an application brief. Get explicit requirements, implied criteria, submission risks, and suggested answer angles.
 - **Answer Generator** — Generate tailored answers using your memory and brief analysis. Choose tone and target length.
 - **LastLook Checker** — Paste your final answer. Get a readiness score (0-100), critical issues, warnings, strong points, and a prioritized fix order.
-- **Sample Demo** — One-click demo with realistic data to see the full flow.
-- **Mock Fallback** — Works without API keys for reliable demos.
+- **Persistent Dashboard** — Integrated with Supabase Auth to save and review past submission checks across devices.
+- **Local Demo Mode** — Works without an account. Falls back to `localStorage` seamlessly.
+- **Robust AI Parsing** — Built-in frontend normalization guarantees structured UI components (no raw JSON text leaks).
+- **Mock Fallback** — Works without AI API keys for reliable demos.
 
 ## Tech Stack
 
 - React + TypeScript + Vite
 - Tailwind CSS
 - Cloudflare Pages + Pages Functions
+- Supabase (PostgreSQL + Auth)
 - AI provider chain: NVIDIA NIM → Cloudflare Workers AI → Mock fallback
 
 ## Environment Variables
@@ -42,6 +45,22 @@ Set these in Cloudflare Pages dashboard under Settings → Environment Variables
 **AI Binding:** If deploying on Cloudflare Pages with a Workers AI binding named `AI`, it will be used automatically (no REST credentials needed).
 
 **Provider order:** NVIDIA NIM → Cloudflare Workers AI → Mock fallback. Without any API keys, the app uses built-in mock responses for demo reliability.
+
+## Supabase Authentication Setup
+
+LastLook uses Supabase to sync review sessions across devices.
+
+Set these in your `.env.local`:
+```env
+VITE_SUPABASE_URL=your-project-url
+VITE_SUPABASE_ANON_KEY=your-anon-key
+```
+
+**Redirect URLs:** In your Supabase Dashboard under **Authentication → URL Configuration**, set the Site URL and add these Redirect URLs so magic links work correctly:
+- Local: `http://localhost:5173/auth/callback` or `http://localhost:8788/auth/callback`
+- Production: `https://YOUR_DOMAIN/auth/callback`
+
+See [SUPABASE_SETUP.md](SUPABASE_SETUP.md) for full database schema instructions.
 
 ## Cloudflare Pages Deployment
 
@@ -86,8 +105,6 @@ CLOUDFLARE_AI_MODEL=@cf/meta/llama-3.1-8b-instruct-fp8-fast
 
 ## What Was Intentionally Cut
 
-- Login / OAuth — unnecessary for the use case
-- Database — localStorage is sufficient for personal memory
 - Application tracker — scope creep
 - Resume parser — not the core value
 - File uploads — not needed for text-based applications
