@@ -18,7 +18,9 @@ import { sampleProfile } from '../lib/sampleData';
 
 interface MemoryPanelProps {
   memory: ApplicationMemory | null;
-  onMemoryChange: (m: ApplicationMemory | null) => void;
+  onMemoryChange?: (m: ApplicationMemory | null) => void;
+  onUpdate?: (m: ApplicationMemory | null) => void;
+  compact?: boolean;
 }
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
@@ -61,7 +63,9 @@ function CopyValueButton({ value }: { value: string }) {
   );
 }
 
-export default function MemoryPanel({ memory, onMemoryChange }: MemoryPanelProps) {
+export default function MemoryPanel({ memory, onMemoryChange, onUpdate, compact }: MemoryPanelProps) {
+  // Support both onUpdate and onMemoryChange prop names
+  const handleUpdate = onUpdate ?? onMemoryChange;
   const [form, setForm] = useState<ApplicationMemory>(memory ?? createEmptyMemory());
   const [status, setStatus] = useState<SaveState>('idle');
   const [statusMessage, setStatusMessage] = useState('');
@@ -178,7 +182,7 @@ export default function MemoryPanel({ memory, onMemoryChange }: MemoryPanelProps
     setStatus('saving');
     try {
       const result = await saveMemory(form);
-      onMemoryChange(result.memory);
+      handleUpdate?.(result.memory);
       setForm(result.memory);
       setStorageMode(result.mode);
       setLastSavedAt(result.memory.updatedAt ?? new Date().toISOString());
@@ -193,7 +197,7 @@ export default function MemoryPanel({ memory, onMemoryChange }: MemoryPanelProps
   const handleSample = async () => {
     setForm(sampleProfile);
     const result = await saveMemory(sampleProfile);
-    onMemoryChange(result.memory);
+    handleUpdate?.(result.memory);
     setStorageMode(result.mode);
     setLastSavedAt(result.memory.updatedAt ?? new Date().toISOString());
     setIsDirty(false);
@@ -204,7 +208,7 @@ export default function MemoryPanel({ memory, onMemoryChange }: MemoryPanelProps
     await clearMemory();
     const empty = createEmptyMemory();
     setForm(empty);
-    onMemoryChange(empty);
+    handleUpdate?.(empty);
     setLastSavedAt(null);
     setIsDirty(false);
     flash('Memory cleared.', 'saved');
@@ -235,7 +239,7 @@ export default function MemoryPanel({ memory, onMemoryChange }: MemoryPanelProps
       flash('Import failed. Check the JSON format.', 'error');
       return;
     }
-    onMemoryChange(imported.memory);
+    handleUpdate?.(imported.memory);
     setForm(imported.memory);
     setStorageMode(imported.mode);
     setLastSavedAt(imported.memory.updatedAt ?? new Date().toISOString());

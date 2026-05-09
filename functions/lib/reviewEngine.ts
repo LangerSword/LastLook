@@ -1,21 +1,184 @@
-import type {
-  ApplicationMemory,
-  ApplicationPacket,
-  ApplicationType,
-  BriefAnalysis,
-  CheckResult,
-  EvidenceBank,
-  FixPlanItem,
-  FullReviewPacket,
-  GeneratedAnswer,
-  ImprovedAnswerVariant,
-  NextBestEdit,
-  RequirementCoverageItem,
-  ReviewerPanelItem,
-  ReviewStrictness,
-} from './types';
-import { buildMemoryEvidence } from './memoryStore';
-import { speakingTime, wordCount } from './utils';
+import type { ApplicationMemory, BriefAnalysis, GeneratedAnswer } from './types';
+
+export interface MemoryProfile {
+  name: string;
+  shortBio: string;
+  currentFocus: string;
+  preferredTone: string;
+  locationTimezone?: string;
+}
+
+export interface MemoryProject {
+  name: string;
+  oneLiner: string;
+  longerExplanation: string;
+  tags: string[];
+  links: string[];
+  proof: string;
+  bestUseCase: string;
+}
+
+export interface MemoryAchievement {
+  title: string;
+  description: string;
+  proof: string;
+  category: string;
+}
+
+export interface LinkVault {
+  github: string;
+  linkedin: string;
+  portfolio: string;
+  resume: string;
+  demoVideo: string;
+  projectLinks: string[];
+  otherLinks: string[];
+}
+
+export interface AnswerLibrarySnippet {
+  title: string;
+  body: string;
+  tags: string[];
+}
+
+export interface MemoryPreferences {
+  preferredTone: string;
+  preferredApplicationTypes: string[];
+  timezone?: string;
+  notes?: string;
+}
+
+export interface ApplicationMemory {
+  profile: MemoryProfile;
+  projects: MemoryProject[];
+  achievements: MemoryAchievement[];
+  answerLibrary: AnswerLibrarySnippet[];
+  linkVault: LinkVault;
+  preferences: MemoryPreferences;
+  updatedAt?: string;
+}
+
+export type ApplicationType = 'Fellowship' | 'Hackathon' | 'Internship' | 'Accelerator' | 'Scholarship' | 'Club/community' | 'Grant' | 'Other';
+export type ReviewStrictness = 'Gentle' | 'Balanced' | 'Brutal';
+
+export interface RequirementCoverageItem {
+  requirement: string;
+  status: 'covered' | 'partial' | 'missing';
+  note: string;
+  evidenceFound: string;
+  whatToAdd: string;
+  priority: 'high' | 'medium' | 'low';
+}
+
+export interface FixPlanItem {
+  step: number;
+  title: string;
+  why: string;
+  effort: string;
+  impact: 'high' | 'medium' | 'low';
+  suggestedText: string;
+}
+
+export interface NextBestEdit {
+  title: string;
+  reason: string;
+  suggestedText: string;
+}
+
+export interface ImprovedAnswerVariant {
+  originalAnswer: string;
+  improvedAnswer: string;
+  whatChanged: string[];
+  whyItIsBetter: string[];
+  wordCount: number;
+  speakingTimeSeconds: number;
+}
+
+export interface EvidenceBank {
+  projects: string[];
+  achievements: string[];
+  links: string[];
+  personalAngles: string[];
+  reusableSnippets: string[];
+  answerSnippets: string[];
+}
+
+export interface BriefAnalysisV2 {
+  summary: string;
+  explicitRequirements: string[];
+  hiddenRequirements: string[];
+  deliverables: string[];
+  requiredLinks: string[];
+  answerTopics: string[];
+  evaluationCriteria: string[];
+  deadlineConstraints: string[];
+  formatConstraints: string[];
+  submissionRisks: string[];
+}
+
+export interface CheckResult {
+  score: number;
+  status: string;
+  criticalIssues: string[];
+  warnings: string[];
+  strongPoints: string[];
+  fixOrder: string[];
+  wordCount: number;
+  speakingTimeSeconds: number;
+}
+
+export interface ReviewerPanelItem {
+  score: number;
+  verdict: string;
+  specificFindings: string[];
+  fixes: string[];
+}
+
+export interface ReviewerPanel {
+  requirements: ReviewerPanelItem;
+  fit: ReviewerPanelItem;
+  clarity: ReviewerPanelItem;
+  evidence: ReviewerPanelItem;
+  length: ReviewerPanelItem;
+  voice: ReviewerPanelItem;
+  risk: ReviewerPanelItem;
+}
+
+export interface DeadlineMode {
+  mode: 'careful' | 'fast' | 'emergency';
+  timeRemaining: string;
+  recommendation: string;
+}
+
+export interface ApplicationPacket {
+  programName: string;
+  applicationType: ApplicationType;
+  overallScore: number;
+  status: string;
+  nextBestEdit: string;
+  finalAnswers: string[];
+  requirementChecklist: RequirementCoverageItem[];
+  requiredLinks: string[];
+  fixPlan: FixPlanItem[];
+  submissionChecklist: string[];
+  exportMarkdown: string;
+}
+
+export interface FullReviewPacket {
+  reviewId: string;
+  programName: string;
+  applicationType: ApplicationType;
+  deadlineMode: DeadlineMode;
+  briefAnalysis: BriefAnalysisV2;
+  evidenceBank: EvidenceBank;
+  requirementCoverage: RequirementCoverageItem[];
+  reviewerPanel: ReviewerPanel;
+  readinessReport: CheckResult;
+  nextBestEdit: NextBestEdit;
+  fixPlan: FixPlanItem[];
+  improvedApplication: ImprovedAnswerVariant;
+  applicationPacket: ApplicationPacket;
+}
 
 const GENERIC_PHRASES = [
   'smart people',
@@ -67,6 +230,14 @@ function tokenScore(text: string, requirement: string): { score: number; matched
   return { score, matchedTokens };
 }
 
+function wordCount(text: string): number {
+  return text.split(/\s+/).filter(Boolean).length;
+}
+
+function speakingTime(wordCountValue: number): number {
+  return Math.round((wordCountValue / 145) * 60);
+}
+
 function detectLinks(text: string): string[] {
   const matches = text.match(/https?:\/\/[^\s)\]]+/gi) || [];
   return unique(matches);
@@ -77,7 +248,7 @@ function detectGenericPhrases(text: string): string[] {
   return GENERIC_PHRASES.filter((phrase) => answer.includes(phrase));
 }
 
-function formatTimeRemaining(deadline?: string): { mode: 'careful' | 'fast' | 'emergency'; timeRemaining: string; recommendation: string } {
+function formatTimeRemaining(deadline?: string): DeadlineMode {
   if (!deadline) {
     return {
       mode: 'careful',
@@ -123,7 +294,7 @@ function formatTimeRemaining(deadline?: string): { mode: 'careful' | 'fast' | 'e
 
 function extractDeliverables(analysis: BriefAnalysis, briefText: string): string[] {
   const source = unique([...(analysis.explicitRequirements || []), briefText]);
-  return source.filter((item) => /video|link|url|portfolio|essay|essay|form|pdf|resume|page|file|script|answer/i.test(item)).slice(0, 8);
+  return source.filter((item) => /video|link|url|portfolio|essay|form|pdf|resume|page|file|script|answer/i.test(item)).slice(0, 8);
 }
 
 function extractRequiredLinks(analysis: BriefAnalysis, memory: ApplicationMemory | null, briefText: string): string[] {
@@ -155,7 +326,40 @@ function buildEvidenceBank(memory: ApplicationMemory | null): EvidenceBank {
     };
   }
 
-  return buildMemoryEvidence(memory);
+  const projects = memory.projects.flatMap((project) => {
+    return [project.name, project.oneLiner, project.longerExplanation, project.bestUseCase].filter(Boolean);
+  });
+
+  const achievements = memory.achievements.flatMap((achievement) => {
+    return [achievement.title, achievement.description, achievement.proof].filter(Boolean);
+  });
+
+  const links = [
+    memory.linkVault.github,
+    memory.linkVault.linkedin,
+    memory.linkVault.portfolio,
+    memory.linkVault.resume,
+    memory.linkVault.demoVideo,
+    ...memory.linkVault.projectLinks,
+    ...memory.linkVault.otherLinks,
+  ].filter(Boolean);
+
+  const personalAngles = [
+    memory.profile.shortBio,
+    memory.profile.currentFocus,
+    memory.preferences.notes || '',
+  ].filter(Boolean);
+
+  const reusableSnippets = memory.answerLibrary.map((snippet) => `${snippet.title}: ${snippet.body}`);
+
+  return {
+    projects,
+    achievements,
+    links,
+    personalAngles,
+    reusableSnippets,
+    answerSnippets: memory.answerLibrary.map((snippet) => snippet.body),
+  };
 }
 
 function buildRequirementCoverage(
@@ -179,7 +383,6 @@ function buildRequirementCoverage(
     const linkVisible = hasRequiredLink && detectLinks(answerText).length > 0;
     const status: RequirementCoverageItem['status'] = hasEvidence && (!isLinkReq || linkVisible) ? 'covered' : (score > 0.15 || (isLinkReq && !linkVisible)) ? 'partial' : 'missing';
 
-    // Find evidence in answer
     const evidenceSentence = answerSentences.find((s) => {
       const sLower = s.toLowerCase();
       return matchedTokens.some((t) => sLower.includes(t));
@@ -208,7 +411,7 @@ function buildRequirementCoverage(
 
     let priority: RequirementCoverageItem['priority'] = 'low';
     if (status === 'missing') {
-      priority = isLinkReq ? 'high' : 'high';
+      priority = 'high';
     } else if (status === 'partial') {
       priority = 'medium';
     }
@@ -244,7 +447,7 @@ function buildReviewerPanel(
   applicationType: ApplicationType,
   strictness?: ReviewStrictness,
   requiredLinks: string[] = []
-): FullReviewPacket['reviewerPanel'] {
+): ReviewerPanel {
   const evidence = buildEvidenceBank(memory);
   const answer = lower(answerText);
   const guide = APPLICATION_TYPE_GUIDE[applicationType] || APPLICATION_TYPE_GUIDE.Other;
@@ -256,10 +459,6 @@ function buildReviewerPanel(
     if (!mentionedProjects.includes(project.name)) return false;
     return ![project.oneLiner, project.longerExplanation, project.bestUseCase].some((needle) => needle && answer.includes(needle.toLowerCase()));
   }) ?? [];
-  const explainedProjects = (memory?.projects.filter((project) => {
-    if (!mentionedProjects.includes(project.name)) return false;
-    return [project.oneLiner, project.longerExplanation, project.bestUseCase].some((needle) => needle && answer.includes(needle.toLowerCase()));
-  }) ?? []);
   const coverageItems = buildRequirementCoverage(analysis, answerText, evidence, requiredLinks, memory);
   const coveredCount = coverageItems.filter((item) => item.status === 'covered').length;
   const missingCount = coverageItems.filter((item) => item.status === 'missing').length;
@@ -407,11 +606,9 @@ function buildImprovedAnswer(
   const hasLink = /https?:\/\//i.test(updated);
   const projectNames = memory?.projects.map((p) => p.name).filter(Boolean) || [];
 
-  // 1. Replace generic phrases one by one with memory-backed alternatives
   if (genericHits.length) {
     const replacements: Record<string, string> = {};
     for (const hit of genericHits) {
-      // Find a project that matches context or use first project
       const contextualProject = memory?.projects.find((p) =>
         updated.toLowerCase().includes(p.name.toLowerCase())
       );
@@ -419,7 +616,6 @@ function buildImprovedAnswer(
       replacements[hit.toLowerCase()] = replacement;
     }
 
-    // Do replacements carefully, word by word
     let replaced = updated;
     for (const [phrase, replacement] of Object.entries(replacements)) {
       const regex = new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
@@ -432,7 +628,6 @@ function buildImprovedAnswer(
     }
   }
 
-  // 2. Explain any mentioned projects that lack explanations
   const mentionedProjects = memory?.projects.filter((p) =>
     updated.toLowerCase().includes(p.name.toLowerCase())
   ) ?? [];
@@ -449,7 +644,6 @@ function buildImprovedAnswer(
     }
   }
 
-  // 3. Add required link if missing
   if (requiredLinks.length > 0 && !hasLink) {
     const savedLink = memory?.linkVault?.portfolio || memory?.linkVault?.github || requiredLinks[0] || '[public link]';
     updated = `${updated} Link: ${savedLink}`;
@@ -457,7 +651,6 @@ function buildImprovedAnswer(
     reasons.push('The brief explicitly requires a publicly accessible link.');
   }
 
-  // 4. Length adjustments
   const targetWords = targetLength && /\d+/.test(targetLength)
     ? Number(targetLength.match(/\d+/)?.[0] || 0)
     : targetLength === '60-90 sec video'
@@ -466,7 +659,6 @@ function buildImprovedAnswer(
   const currentWords = wordCount(updated);
 
   if (currentWords < targetWords * 0.8) {
-    // Add a concrete project detail from memory, never invent
     const projectToAdd = memory?.projects.find((p) => p.bestUseCase || p.oneLiner);
     if (projectToAdd) {
       const addition = `A good example is ${projectToAdd.name}${projectToAdd.bestUseCase ? ` — ${projectToAdd.bestUseCase}` : '.'}`;
@@ -503,7 +695,7 @@ function buildImprovedAnswer(
 function buildFixPlan(
   analysis: BriefAnalysis,
   packet: RequirementCoverageItem[],
-  reviewerPanel: FullReviewPacket['reviewerPanel'],
+  reviewerPanel: ReviewerPanel,
   memory: ApplicationMemory | null,
   answerText: string,
   requiredLinks: string[] = [],
@@ -518,7 +710,6 @@ function buildFixPlan(
   ) ?? [];
   const links = detectLinks(answerText);
 
-  // 1. Missing public link is always highest priority
   if (requiredLinks.length > 0 && !links.length) {
     const savedLink = memory?.linkVault?.portfolio || memory?.linkVault?.github || requiredLinks[0] || '[your public link]';
     items.push({
@@ -531,7 +722,6 @@ function buildFixPlan(
     });
   }
 
-  // 2. Unexplained projects
   if (unexplainedProjects.length > 0) {
     const first = unexplainedProjects[0];
     items.push({
@@ -544,7 +734,6 @@ function buildFixPlan(
     });
   }
 
-  // 3. Missing requirements
   const missingHigh = packet.filter((item) => item.status === 'missing' && item.priority === 'high');
   for (const missing of missingHigh.slice(0, 2)) {
     items.push({
@@ -557,7 +746,6 @@ function buildFixPlan(
     });
   }
 
-  // 4. Generic phrasing
   if (genericHits.length) {
     const firstHit = genericHits[0];
     const replacementProject = memory?.projects.find((p) => p.oneLiner) || memory?.projects[0];
@@ -573,7 +761,6 @@ function buildFixPlan(
     });
   }
 
-  // 5. Length mismatch
   if (reviewerPanel.length.score < 80) {
     const w = wordCount(answerText);
     const t = speakingTime(w);
@@ -589,7 +776,6 @@ function buildFixPlan(
     });
   }
 
-  // 6. Weak fit
   if (reviewerPanel.fit.score < 80 && items.length < 5) {
     items.push({
       step: items.length + 1,
@@ -624,15 +810,11 @@ function buildExportMarkdown(packet: FullReviewPacket): string {
   ].join('\n');
 }
 
-function buildDeadlineMode(deadline?: string): FullReviewPacket['deadlineMode'] {
-  return formatTimeRemaining(deadline);
-}
-
 function buildReadinessReport(
   analysis: BriefAnalysis,
   answerText: string,
   coverage: RequirementCoverageItem[],
-  reviewStrictness?: ReviewStrictness,
+  strictness?: ReviewStrictness,
   requiredLinks: string[] = []
 ): CheckResult {
   const genericHits = detectGenericPhrases(answerText);
@@ -653,7 +835,7 @@ function buildReadinessReport(
   score -= isVideoBrief && wordTotal < 100 ? 12 : 0;
   score -= isVideoBrief && wordTotal > 240 ? 8 : 0;
   score -= Math.abs(wordTotal - 170) > 60 ? 8 : 0;
-  score -= reviewStrictness === 'Brutal' ? 3 : 0;
+  score -= strictness === 'Brutal' ? 3 : 0;
   score = clamp(score);
 
   const criticalIssues: string[] = [];
@@ -733,7 +915,7 @@ export function buildFullReviewPacket({
 }: DeterministicReviewInput): FullReviewPacket {
   const answerText = answer || generatedAnswer?.draft || '';
   const evidenceBank = buildEvidenceBank(memory ?? null);
-  const deadlineMode = buildDeadlineMode(deadline);
+  const deadlineMode = formatTimeRemaining(deadline);
   const requiredLinks = extractRequiredLinks(briefAnalysis, memory ?? null, question);
   const requirementCoverage = buildRequirementCoverage(briefAnalysis, answerText, evidenceBank, requiredLinks, memory ?? null, deadline);
   const readinessReport = buildReadinessReport(briefAnalysis, answerText, requirementCoverage, reviewStrictness, requiredLinks);
@@ -803,13 +985,4 @@ export function buildFullReviewPacket({
 
   packet.applicationPacket.exportMarkdown = buildExportMarkdown(packet);
   return packet;
-}
-
-export function summarizeReviewForChecklist(packet: FullReviewPacket) {
-  return {
-    score: packet.readinessReport.score,
-    nextBestEdit: packet.nextBestEdit.title,
-    missingRequirements: packet.requirementCoverage.filter((item) => item.status !== 'covered').length,
-    requiredLinks: packet.applicationPacket.requiredLinks,
-  };
 }

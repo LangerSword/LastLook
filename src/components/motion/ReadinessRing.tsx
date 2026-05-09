@@ -5,6 +5,7 @@ interface ReadinessRingProps {
   score: number;
   size?: number;
   label?: string;
+  strokeWidth?: number;
 }
 
 function getScoreColor(score: number): string {
@@ -17,13 +18,14 @@ export default function ReadinessRing({
   score,
   size = 160,
   label = 'Readiness',
+  strokeWidth: strokeWidthProp,
 }: ReadinessRingProps) {
   const shouldReduceMotion = useReducedMotion();
 
   const clampedScore = Math.max(0, Math.min(100, score));
   const color = useMemo(() => getScoreColor(clampedScore), [clampedScore]);
 
-  const strokeWidth = Math.max(8, Math.round(size / 20));
+  const strokeWidth = strokeWidthProp ?? Math.max(8, Math.round(size / 20));
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (clampedScore / 100) * circumference;

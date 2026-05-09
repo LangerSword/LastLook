@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Sparkles, Play, ChevronDown, Zap, Brain, FileText, ScanLine, Pencil, ArrowRight, ClipboardCheck, Package, Layout, Terminal } from 'lucide-react';
+import { Sparkles, Play, ChevronDown, Zap, Brain, FileText, ScanLine, Pencil, ArrowRight, ClipboardCheck, Package, Layout, Terminal, CheckCircle2 } from 'lucide-react';
 import type { ApplicationMemory, BriefAnalysis, GeneratedAnswer, CheckResult, ToneOption, LengthOption, ApplicationType, ReviewStrictness } from '../lib/types';
 import { getMemory, saveMemory } from '../lib/memoryStore';
 import { sampleProfile, sampleBrief, sampleQuestion, sampleWeakAnswer } from '../lib/sampleData';
@@ -152,6 +153,7 @@ export default function AppWorkspace() {
   };
 
   const handleDemo = async () => {
+const handleDemo = async () => {
     const saved = await saveMemory(sampleProfile);
     setMemory(saved.memory);
     setBrief(sampleBrief); setQuestion(sampleQuestion); setFinalAnswer(sampleWeakAnswer);
@@ -159,6 +161,15 @@ export default function AppWorkspace() {
     setApplicationType('Fellowship');
     setAnalysis(null); setGenerated(null); setCheckResult(null);
   };
+  };
+
+  function handleGenerated(next: GeneratedAnswer) {
+    setGenerated(next);
+    const draft = next?.draft ?? '';
+    if (draft) {
+      setFinalAnswer(draft);
+    }
+  }
 
   return (
     <div className="min-h-screen bg-[var(--bg)]">

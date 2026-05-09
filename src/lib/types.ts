@@ -126,6 +126,9 @@ export interface RequirementCoverageItem {
   requirement: string;
   status: 'covered' | 'partial' | 'missing';
   note: string;
+  evidenceFound: string;
+  whatToAdd: string;
+  priority: 'high' | 'medium' | 'low';
 }
 
 export interface ReviewerPanelItem {

@@ -24,14 +24,17 @@ type TweakMode =
   | 'fix-tone';
 
 interface Props {
-  memory: ApplicationMemory | null;
-  analysis: BriefAnalysis | null;
-  question: string;
-  currentAnswer: string;
+  memory?: ApplicationMemory | null;
+  analysis?: BriefAnalysis | null;
+  question?: string;
+  answer?: string;
+  currentAnswer?: string;
+  onUpdate?: (value: string) => void;
   applicationType?: ApplicationType;
   reviewStrictness?: ReviewStrictness;
-  onReplaceAnswer: (value: string) => void;
-  onSaveToLibrary: (value: string) => void;
+  onReplaceAnswer?: (value: string) => void;
+  onSaveToLibrary?: (value: string) => void;
+  brief?: string;
 }
 
 const genericPhrases = [
@@ -249,25 +252,34 @@ export default function TweakLab({
   memory,
   analysis,
   question,
+  answer: answerProp,
   currentAnswer,
+  onUpdate: onUpdateProp,
   applicationType,
   reviewStrictness,
   onReplaceAnswer,
   onSaveToLibrary,
+  brief,
 }: Props) {
   const [mode, setMode] = useState<TweakMode>('strengthen-fit');
   const [result, setResult] = useState<TweakResult | null>(null);
 
-  const answerLength = useMemo(() => wordCount(currentAnswer), [currentAnswer]);
+  // Support both answer and currentAnswer prop names
+  const answerValue = answerProp ?? currentAnswer ?? '';
+  
+  const answerLength = useMemo(() => wordCount(answerValue), [answerValue]);
+
+  // Support both onUpdate and onReplaceAnswer prop names
+  const handleUpdate = onUpdateProp ?? onReplaceAnswer;
 
   const run = (nextMode: TweakMode) => {
     setMode(nextMode);
-    setResult(getResult(nextMode, currentAnswer, memory, applicationType, question, reviewStrictness));
+    setResult(getResult(nextMode, answerValue, memory ?? null, applicationType, question ?? '', reviewStrictness));
   };
 
   const saveSnippet = async () => {
     if (!result) return;
-    onSaveToLibrary(result.updatedText);
+    onSaveToLibrary?.(result.updatedText);
     if (memory) {
       await saveMemory(memory);
     }
@@ -358,7 +370,7 @@ export default function TweakLab({
                 <button onClick={() => navigator.clipboard.writeText(result.updatedText)} className="btn-ghost text-[12px] px-3 py-2">
                   <Copy className="w-3.5 h-3.5" /> Copy
                 </button>
-                <button onClick={() => onReplaceAnswer(result.updatedText)} className="btn-secondary text-[12px] px-3 py-2">
+                <button onClick={() => handleUpdate?.(result.updatedText)} className="btn-secondary text-[12px] px-3 py-2">
                   <ArrowLeftRight className="w-3.5 h-3.5" /> Replace
                 </button>
                 <button onClick={saveSnippet} className="btn-primary text-[12px] px-3 py-2">

@@ -1,7 +1,7 @@
 import { callLLM } from '../lib/callLLM';
-import { ANALYZE_SYSTEM, GENERATE_SYSTEM, CHECK_SYSTEM } from '../lib/prompts';
-import { verifyUserWithReason, isServerSupabaseConfigured } from '../lib/auth';
+import { verifyUserWithReason } from '../lib/auth';
 import { checkAndLogUsage } from '../lib/usage';
+import { buildFullReviewPacket, DeterministicReviewInput, type BriefAnalysis, type GeneratedAnswer } from '../lib/reviewEngine';
 
 interface Env {
   NVIDIA_API_KEY?: string;
@@ -14,6 +14,100 @@ interface Env {
   SUPABASE_URL?: string;
   SUPABASE_ANON_KEY?: string;
   ADMIN_EMAILS?: string;
+}
+
+const ANALYZE_SYSTEM = `You are an application brief analyzer for student applications.
+
+Given an application brief, analyze it and return a JSON object with these exact fields:
+- explicitRequirements: string[] — what the brief explicitly asks for
+- impliedCriteria: string[] — what evaluators are likely looking for beyond the stated requirements
+- submissionRisks: string[] — common mistakes or things applicants miss
+- suggestedAngles: string[] — strategic approaches to answering well
+- summary: string — a 1-2 sentence summary of what the evaluator actually wants
+
+Rules:
+- Every item must reference the actual brief, not generic application advice.
+- Prefer exact nouns, deliverables, constraints, and evaluator language from the brief.
+- If the brief mentions a deliverable (video, link, portfolio, form, essay length), include it explicitly.
+- Extract hidden requirements only when they are clearly implied by the brief text.
+- Do not invent evaluation criteria that are not grounded in the brief.
+
+Return ONLY valid JSON. No markdown, no explanation. Do not wrap the response in json code fences.`;
+
+const GENERATE_SYSTEM = `You are an application answer generator.
+
+Given a user's memory (bio, projects, achievements), a brief analysis, a question, a tone preference, and a target length, generate a tailored answer draft.
+
+Rules:
+- Include concrete details from memory, answer library, or brief whenever possible.
+- If a project name appears, explain it in one short line the first time it is mentioned.
+- Avoid generic claims like "passionate" or "exciting" without evidence.
+- Make each sentence carry a unique purpose.
+- If a public link is required, include a visible placeholder such as [link] near the first mention.
+- Match the target length closely and preserve a human, non-robotic voice.
+
+Return a JSON object with these exact fields:
+- draft: string — the generated answer text
+- whyItWorks: string[] — 3-5 reasons why this draft is effective
+- customize: string[] — 2-3 suggestions for further customization
+
+For target lengths:
+- "100 words": ~100 words
+- "150 words": ~150 words
+- "200 words": ~200 words
+- "60-90 sec video": ~145-220 words (speaking pace is ~145 words/minute)
+
+Return ONLY valid JSON. No markdown, no explanation. Do not wrap the response in json code fences.`;
+
+function parseLLMResponse<T>(raw: string, fallback: T): T {
+  try {
+    const cleanRaw = raw.replace(/^```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$/s, '$1').trim();
+    return JSON.parse(cleanRaw) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function buildFallbackBriefAnalysis(brief: string): BriefAnalysis {
+  const explicitRequirements: string[] = [];
+  const impliedCriteria: string[] = [];
+  const submissionRisks: string[] = [];
+  const suggestedAngles: string[] = [];
+
+  if (/link|url|website|portfolio|github/i.test(brief)) {
+    explicitRequirements.push('Public link must be included');
+    submissionRisks.push('Missing required link can disqualify submission');
+  }
+  if (/video|pitch|60.*second|90.*second/i.test(brief)) {
+    explicitRequirements.push('60-90 second video');
+    impliedCriteria.push('Clear verbal delivery');
+  }
+  if (/why.*fit|fit.*fellowship|why.*this/i.test(brief)) {
+    explicitRequirements.push('Explain why this opportunity fits you');
+    impliedCriteria.push('Show specific alignment with program values');
+  }
+
+  return {
+    explicitRequirements,
+    impliedCriteria,
+    submissionRisks,
+    suggestedAngles,
+    summary: 'Analyzed fallback: ' + brief.slice(0, 100),
+  };
+}
+
+function buildFallbackGeneratedAnswer(answer: string, brief: BriefAnalysis): GeneratedAnswer {
+  return {
+    draft: answer || '',
+    whyItWorks: [
+      'Answer provided by user',
+      'Includes specific project details from memory',
+    ],
+    customize: [
+      'Add a clear opening sentence stating who you are',
+      'Connect your current work to the opportunity',
+    ],
+  };
 }
 
 export const onRequestPost: PagesFunction<Env> = async (context) => {
@@ -36,9 +130,6 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     
     const user = result.user;
 
-    // Since this is a combined call, we check limit FIRST to avoid wasting AI calls if quota is exceeded.
-    // However, we need provider/model to log. We can log after the first AI call.
-    // Let's do a pre-check first.
     const preCheckError = await checkAndLogUsage(user, 'full_review', context.env, 'pending', 'pending');
     if (preCheckError) {
       return preCheckError;
@@ -53,109 +144,104 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       });
     }
 
-    // 1. Analyze
-    const { content: rawAnalyze, provider, model } = await callLLM(
-      [
-        { role: 'system', content: ANALYZE_SYSTEM },
-        { role: 'user', content: `Analyze this application brief:\n\n${body.brief}` },
-      ],
-      context.env
-    );
+    const briefText = body.brief as string;
+    const question = body.question as string;
+    const memory = body.memory || null;
+    const programName = body.programName || 'Untitled opportunity';
+    const applicationType = (body.applicationType || 'Other') as any;
+    const reviewStrictness = body.reviewStrictness || 'Balanced';
+    const targetLength = body.targetLength || '150 words';
+    const deadline = body.deadline || undefined;
+    const userAnswer = body.finalAnswer?.trim() || null;
 
-    let briefAnalysis;
+    let briefAnalysis: BriefAnalysis;
+    let generatedAnswer: GeneratedAnswer | null = null;
+    let aiError: string | null = null;
+
     try {
-      const cleanRaw = rawAnalyze.replace(/^```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$/s, '$1').trim();
-      briefAnalysis = JSON.parse(cleanRaw);
-    } catch {
-      briefAnalysis = {
-        explicitRequirements: ['Could not parse AI response'],
-        impliedCriteria: [],
-        submissionRisks: [],
-        suggestedAngles: [],
-        summary: rawAnalyze,
-      };
+      const { content: rawAnalyze } = await callLLM(
+        [
+          { role: 'system', content: ANALYZE_SYSTEM },
+          { role: 'user', content: `Analyze this application brief:\n\n${briefText}` },
+        ],
+        context.env
+      );
+
+      briefAnalysis = parseLLMResponse<BriefAnalysis>(rawAnalyze, buildFallbackBriefAnalysis(briefText));
+    } catch (err) {
+      aiError = `Brief analysis failed: ${err}`;
+      briefAnalysis = buildFallbackBriefAnalysis(briefText);
     }
 
-    // 2. Generate
-    const genPrompt = `Memory: ${JSON.stringify(body.memory || {})}
-  Brief Analysis: ${JSON.stringify(briefAnalysis)}
-  Question: ${body.question}
-  Program Name: ${body.programName || 'Unknown'}
-  Application Type: ${body.applicationType || 'General'}
-  Review Strictness: ${body.reviewStrictness || 'Balanced'}
-  Tone: ${body.tone || 'Confident'}
-  Target Length: ${body.targetLength || '150 words'}
-  Deadline: ${body.deadline || 'Not provided'}
+    if (!userAnswer) {
+      try {
+        const genPrompt = `Memory: ${JSON.stringify(memory || {})}
+Brief Analysis: ${JSON.stringify(briefAnalysis)}
+Question: ${question}
+Program Name: ${programName}
+Application Type: ${applicationType}
+Review Strictness: ${reviewStrictness}
+Tone: ${body.tone || 'Confident'}
+Target Length: ${targetLength}
+Deadline: ${deadline || 'Not provided'}
 
-  Generate a tailored answer draft.`;
+Generate a tailored answer draft.`;
 
-    const { content: rawGenerate } = await callLLM(
-      [
-        { role: 'system', content: GENERATE_SYSTEM },
-        { role: 'user', content: genPrompt },
-      ],
-      context.env
-    );
+        const { content: rawGenerate } = await callLLM(
+          [
+            { role: 'system', content: GENERATE_SYSTEM },
+            { role: 'user', content: genPrompt },
+          ],
+          context.env
+        );
 
-    let generatedAnswer;
-    try {
-      const cleanRaw = rawGenerate.replace(/^```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$/s, '$1').trim();
-      generatedAnswer = JSON.parse(cleanRaw);
-    } catch {
-      generatedAnswer = {
-        draft: rawGenerate,
-        whyItWorks: ['Could not parse AI response'],
-        customize: [],
-      };
+        generatedAnswer = parseLLMResponse<GeneratedAnswer>(rawGenerate, buildFallbackGeneratedAnswer('', briefAnalysis));
+      } catch (err) {
+        aiError = aiError ? `${aiError}; Generation failed: ${err}` : `Generation failed: ${err}`;
+        generatedAnswer = buildFallbackGeneratedAnswer('', briefAnalysis);
+      }
     }
 
-    // 3. Check
-    const finalAnswerText = body.finalAnswer?.trim() || generatedAnswer.draft;
-    const wordCount = finalAnswerText.split(/\s+/).filter(Boolean).length;
-    const speakingTimeSeconds = Math.round((wordCount / 145) * 60);
+    const deterministicInput: DeterministicReviewInput = {
+      briefAnalysis,
+      answer: userAnswer || generatedAnswer?.draft || '',
+      question,
+      memory,
+      applicationType,
+      reviewStrictness,
+      programName,
+      deadline,
+      generatedAnswer,
+      targetLength,
+    };
 
-    const checkPrompt = `Brief Analysis: ${JSON.stringify(briefAnalysis)}
-  Question: ${body.question}
-  Target: ${body.target || 'general'}
-  Program Name: ${body.programName || 'Unknown'}
-  Application Type: ${body.applicationType || 'General'}
-  Review Strictness: ${body.reviewStrictness || 'Balanced'}
-  Deadline: ${body.deadline || 'Not provided'}
+    const fullReviewPacket = buildFullReviewPacket(deterministicInput);
 
-  Answer to review:
-  ${finalAnswerText}
-
-  Evaluate this answer and return a score with detailed feedback.`;
-
-    const { content: rawCheck } = await callLLM(
-      [
-        { role: 'system', content: CHECK_SYSTEM },
-        { role: 'user', content: checkPrompt },
-      ],
-      context.env
-    );
-
-    let readinessReport;
-    try {
-      const cleanRaw = rawCheck.replace(/^```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$/s, '$1').trim();
-      readinessReport = JSON.parse(cleanRaw);
-    } catch {
-      readinessReport = {
-        score: 0,
-        status: "Error",
-        criticalIssues: ["Could not parse AI response"],
-        warnings: [],
-        strongPoints: [],
-        fixOrder: [],
-      };
+    if (aiError) {
+      fullReviewPacket.readinessReport.warnings.push(`AI enhancement had issues: ${aiError}`);
     }
+
+    const wordCount = fullReviewPacket.readinessReport.wordCount;
+    const speakingTimeSeconds = fullReviewPacket.readinessReport.speakingTimeSeconds;
 
     return new Response(JSON.stringify({
-      briefAnalysis,
+      success: true,
+      reviewId: fullReviewPacket.reviewId,
+      programName: fullReviewPacket.programName,
+      applicationType: fullReviewPacket.applicationType,
+      deadlineMode: fullReviewPacket.deadlineMode,
+      briefAnalysis: fullReviewPacket.briefAnalysis,
+      evidenceBank: fullReviewPacket.evidenceBank,
+      requirementCoverage: fullReviewPacket.requirementCoverage,
+      reviewerPanel: fullReviewPacket.reviewerPanel,
+      readinessReport: fullReviewPacket.readinessReport,
+      nextBestEdit: fullReviewPacket.nextBestEdit,
+      fixPlan: fullReviewPacket.fixPlan,
+      improvedApplication: fullReviewPacket.improvedApplication,
+      applicationPacket: fullReviewPacket.applicationPacket,
       generatedAnswer,
-      readinessReport,
       wordCount,
-      speakingTimeSeconds
+      speakingTimeSeconds,
     }), {
       headers: { 'Content-Type': 'application/json' },
     });

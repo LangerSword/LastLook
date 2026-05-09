@@ -19,12 +19,13 @@ export interface LoadingState {
 }
 
 interface Props {
-  analysis: BriefAnalysis | null;
-  generated: GeneratedAnswer | null;
-  checkResult: CheckResult | null;
-  loadingState: LoadingState | null;
-  error: string | null;
-  onReset: () => void;
+  analysis?: BriefAnalysis | null;
+  generated?: GeneratedAnswer | null;
+  checkResult?: CheckResult | null;
+  loading?: LoadingState | null;
+  loadingState?: LoadingState | null;
+  error?: string | null;
+  onReset?: () => void;
   memory?: ApplicationMemory | null;
   briefText?: string;
   question?: string;
@@ -37,6 +38,7 @@ interface Props {
   onSaveSession?: () => void;
   saveState?: 'idle' | 'saving' | 'saved' | 'error';
   saveError?: string | null;
+  onGenerated?: (g: GeneratedAnswer) => void;
 }
 
 type TabId = 'overview' | 'requirements' | 'draft' | 'readiness' | 'fix';
@@ -45,7 +47,8 @@ export default function ReviewStudio({
   analysis,
   generated,
   checkResult,
-  loadingState,
+  loading: loadingProp,
+  loadingState: loadingStateProp,
   error,
   onReset,
   memory,
@@ -60,9 +63,13 @@ export default function ReviewStudio({
   openReviewPath,
   saveState = 'idle',
   saveError,
+  onGenerated,
 }: Props) {
   const [activeTab, setActiveTab] = useState<TabId>('overview');
   const navigate = useNavigate();
+  
+  // Support both loading and loadingState prop names
+  const loadingState = loadingProp ?? loadingStateProp;
 
   // Auto-switch tabs when new data arrives
   useEffect(() => {

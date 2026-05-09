@@ -39,7 +39,21 @@ const findCoverage = (requirements: string[], answer: string): RequirementCovera
         ? `Partially addressed. Add a direct line about ${tokens[0] || 'this requirement'}.`
         : `No direct mention found. Add one sentence that answers this explicitly.`;
 
-    return { requirement, status, note };
+    const evidenceFound = status === 'covered'
+      ? `Found ${matches.length} matching tokens in the answer.`
+      : status === 'partial'
+        ? `Found ${matches.length} matching tokens. Add more detail.`
+        : 'No direct evidence found in the answer.';
+
+    const whatToAdd = status === 'missing'
+      ? `Add one sentence that directly answers: "${requirement}".`
+      : status === 'partial'
+        ? `Add more specific details about ${tokens[0] || 'this requirement'}.`
+        : 'The requirement is covered. Add more specificity if possible.';
+
+    const priority: RequirementCoverageItem['priority'] = status === 'missing' ? 'high' : status === 'partial' ? 'medium' : 'low';
+
+    return { requirement, status, note, evidenceFound, whatToAdd, priority };
   });
 };
 
