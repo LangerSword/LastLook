@@ -47,16 +47,6 @@ const PREP_CARDS = [
   { icon: ClipboardCheck, title: 'Run final check', desc: 'One button. Six agents. A readiness score. Know before you submit.' },
 ];
 
-const EXPERIENCES = [
-  { icon: ScanLine, title: 'Requirement extraction', desc: 'The brief is parsed into a checklist you can check off one by one.' },
-  { icon: FileText, title: 'Evidence mapping', desc: 'Your saved projects and achievements are matched against what the brief asks for.' },
-  { icon: MessageSquare, title: 'Generic phrase cleanup', desc: 'Filler like "smart people" is flagged and replaced with memory-specific detail.' },
-  { icon: FolderOpen, title: 'Project explanation check', desc: 'Named projects are checked to make sure they are explained, not just listed.' },
-  { icon: Link2, title: 'Link vault check', desc: 'If the brief wants a link, we check your vault and suggest the right one.' },
-  { icon: Play, title: 'Video script timing', desc: 'Word count is converted to speaking time at 145 words per minute.' },
-  { icon: Package, title: 'Final packet export', desc: 'Everything compiled into a copy-ready markdown packet with a checklist.' },
-];
-
 function JourneyCard({ step, index }: { step: typeof JOURNEY_STEPS[0]; index: number }) {
   const Icon = step.icon;
   return (
@@ -67,16 +57,18 @@ function JourneyCard({ step, index }: { step: typeof JOURNEY_STEPS[0]; index: nu
       transition={{ duration: 0.5, delay: index * 0.12 }}
       className="relative"
     >
-      <div className="card p-6 md:p-8 h-full flex flex-col items-center text-center group">
-        <div className="w-16 h-16 rounded-2xl bg-[var(--accent-soft)] flex items-center justify-center mb-5 group-hover:scale-110 transition-transform duration-300">
-          <Icon className="w-7 h-7 text-[var(--accent)]" />
+      <div className="card p-8 md:p-10 h-full flex flex-col items-center text-center group bg-[var(--surface-2)] border-2 border-[var(--border)] hover:border-[var(--accent)] transition-all duration-300">
+        <div className="w-20 h-20 rounded-3xl bg-[var(--accent-soft)] flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300 shadow-soft">
+          <Icon className="w-9 h-9 text-[var(--accent)]" />
         </div>
-        <h3 className="text-[18px] font-bold text-ink mb-2 font-headline">{step.label}</h3>
-        <p className="text-[13px] text-ink-secondary leading-relaxed">{step.desc}</p>
+        <h3 className="text-[22px] font-bold text-ink mb-3 font-headline tracking-tight">{step.label}</h3>
+        <p className="text-[15px] text-ink-secondary leading-relaxed">{step.desc}</p>
       </div>
       {index < JOURNEY_STEPS.length - 1 && (
-        <div className="hidden lg:block absolute top-1/2 -right-3 translate-x-1/2 -translate-y-1/2 z-10">
-          <ChevronRight className="w-5 h-5 text-ink-faint" />
+        <div className="hidden lg:block absolute top-1/2 -right-4 translate-x-1/2 -translate-y-1/2 z-10">
+          <div className="w-8 h-[2px] bg-[var(--border)] relative">
+            <div className="absolute top-1/2 right-0 -translate-y-1/2 w-2 h-2 rounded-full bg-[var(--accent)]" />
+          </div>
         </div>
       )}
     </motion.div>
@@ -85,7 +77,7 @@ function JourneyCard({ step, index }: { step: typeof JOURNEY_STEPS[0]; index: nu
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <span className="inline-block font-mono text-[10px] text-ink-muted uppercase tracking-[0.14em] mb-3">
+    <span className="inline-block font-mono text-[11px] text-[var(--accent)] font-bold uppercase tracking-[0.2em] mb-4 bg-[var(--accent-soft)] px-3 py-1 rounded-md">
       {children}
     </span>
   );
@@ -103,25 +95,25 @@ export default function LandingPage() {
   const handleWalkthrough = () => navigate('/walkthrough');
 
   return (
-    <div className="pb-24 pt-6 md:pt-8 animate-fade-in">
+    <div className="pb-24 animate-fade-in overflow-x-hidden">
 
       {/* ─── HERO ─────────────────────────────────────────────────── */}
-      <AnimatedSection id="hero" className="relative py-20 md:py-32 overflow-hidden">
-        <SpectraNoise className="opacity-60" />
+      <section id="hero" className="relative min-h-[90vh] flex items-center justify-center py-20 overflow-hidden bg-[var(--bg)]">
+        <SpectraNoise className="opacity-40" />
         <div aria-hidden className="pointer-events-none absolute inset-0">
-          <div className="absolute -top-40 left-1/2 h-[500px] w-[500px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(var(--accent-rgb),0.16),transparent_70%)] blur-3xl animate-pulse" />
-          <div className="absolute top-32 right-[-10%] h-[300px] w-[300px] rounded-full bg-[radial-gradient(circle,rgba(var(--accent-rgb),0.08),transparent_70%)] blur-3xl animate-pulse" style={{ animationDelay: '1.5s' }} />
+          <div className="absolute -top-40 left-1/2 h-[600px] w-[600px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(var(--accent-rgb),0.2),transparent_70%)] blur-3xl animate-pulse" />
+          <div className="absolute bottom-0 right-[-10%] h-[400px] w-[400px] rounded-full bg-[radial-gradient(circle,rgba(var(--accent-rgb),0.1),transparent_70%)] blur-3xl" />
         </div>
 
-        <div className="relative max-w-[900px] mx-auto text-center px-4">
+        <div className="relative max-w-[1200px] mx-auto text-center px-6">
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-surface border border-edge mb-10 shadow-soft"
+            className="inline-flex items-center gap-3 px-5 py-2.5 rounded-full bg-[var(--surface)] border-2 border-[var(--border)] mb-12 shadow-lift"
           >
-            <Terminal className="w-3.5 h-3.5 text-[var(--accent)]" />
-            <span className="font-mono text-[12px] sm:text-[13px] text-ink-secondary tracking-tight">
+            <Terminal className="w-4 h-4 text-[var(--accent)]" />
+            <span className="font-mono text-[14px] text-ink-secondary tracking-tight font-bold">
               lastlook run --before-submit
             </span>
           </motion.div>
@@ -130,7 +122,7 @@ export default function LandingPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.1 }}
-            className="text-[clamp(2.8rem,8vw,6.5rem)] font-extrabold tracking-tight text-ink leading-[1.02] mb-6 font-display"
+            className="text-[clamp(3.5rem,10vw,8rem)] font-black tracking-tighter text-ink leading-[0.9] mb-8 font-display uppercase"
           >
             The final check<br className="hidden sm:block" />
             <span className="text-[var(--accent)]"> before you submit.</span>
@@ -140,7 +132,7 @@ export default function LandingPage() {
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.2 }}
-            className="text-[clamp(1.05rem,2vw,1.25rem)] text-ink-secondary leading-[1.75] mb-8 max-w-2xl mx-auto"
+            className="text-[clamp(1.1rem,2.5vw,1.5rem)] text-ink-secondary leading-[1.6] mb-12 max-w-3xl mx-auto font-medium"
           >
             Turn any application brief into a checklist, let reviewer agents inspect your answers, and leave with a readiness dashboard before you send it.
           </motion.p>
@@ -149,267 +141,175 @@ export default function LandingPage() {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.3 }}
-            className="flex flex-col sm:flex-row gap-3 justify-center mb-10"
+            className="flex flex-col sm:flex-row gap-4 justify-center mb-16"
           >
-            <button id="btn-load-demo" onClick={handleStart} className="btn-primary text-[15px] px-8 py-3.5">
-              <Zap className="w-[17px] h-[17px]" />
+            <button id="btn-load-demo" onClick={handleStart} className="btn-primary text-[18px] px-10 py-5 rounded-2xl shadow-lift hover:scale-105 transition-transform">
+              <Zap className="w-[20px] h-[20px]" />
               Start a review
             </button>
-            <button onClick={handleWalkthrough} className="btn-secondary text-[15px] px-8 py-3.5">
+            <button onClick={handleWalkthrough} className="btn-secondary text-[18px] px-10 py-5 rounded-2xl border-2 hover:bg-[var(--surface-2)] transition-colors">
               Try sample
-              <ArrowRight className="w-[17px] h-[17px]" />
+              <ArrowRight className="w-[20px] h-[20px]" />
             </button>
           </motion.div>
 
-          <motion.div
+          {/* Journey Strip Animation Placeholder */}
+          <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ duration: 0.5, delay: 0.45 }}
-            className="flex flex-wrap items-center justify-center gap-2 sm:gap-3"
+            transition={{ delay: 0.5, duration: 1 }}
+            className="w-full max-w-4xl mx-auto h-[2px] bg-gradient-to-r from-transparent via-[var(--accent)] to-transparent relative"
           >
-            {['Reviewer agents', 'Readiness dashboard', 'Application packets', 'Local / BYOK'].map((chip) => (
-              <span key={chip} className="px-3 py-1.5 rounded-full border border-edge bg-surface text-[12px] font-medium text-ink-secondary">
-                {chip}
-              </span>
-            ))}
+            <div className="absolute top-1/2 left-0 -translate-y-1/2 w-3 h-3 rounded-full bg-[var(--accent)] blur-[2px] animate-[move_5s_linear_infinite]" />
           </motion.div>
         </div>
-      </AnimatedSection>
+      </section>
 
       {/* ─── SUBMISSION JOURNEY ───────────────────────────────────── */}
-      <AnimatedSection className="mb-24 md:mb-32 px-4">
-        <div className="max-w-[1100px] mx-auto">
-          <div className="text-center mb-14">
+      <section className="py-32 px-6 bg-[var(--surface)]">
+        <div className="max-w-[1300px] mx-auto">
+          <div className="text-center mb-20">
             <SectionLabel>Your submission journey</SectionLabel>
-            <h2 className="text-[clamp(1.8rem,3.5vw,3rem)] font-bold text-ink font-headline">
+            <h2 className="text-[clamp(2.5rem,5vw,4.5rem)] font-black text-ink font-headline uppercase tracking-tighter leading-none">
               From brief to packet.
             </h2>
-            <p className="text-[15px] text-ink-secondary mt-3 max-w-lg mx-auto">
-              Five stages. One smooth flow. No more submitting blind.
+            <p className="text-[18px] text-ink-secondary mt-6 max-w-2xl mx-auto font-medium">
+              Five stages. One bold flow. No more submitting blind.
             </p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 lg:gap-8">
             {JOURNEY_STEPS.map((step, i) => (
               <JourneyCard key={step.label} step={step} index={i} />
             ))}
           </div>
         </div>
-      </AnimatedSection>
+      </section>
 
       {/* ─── THINGS THAT KILL APPLICATIONS ────────────────────────── */}
-      <AnimatedSection className="mb-24 md:mb-32 px-4">
-        <div className="max-w-[1100px] mx-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
+      <section className="py-32 px-6 bg-[var(--bg)]">
+        <div className="max-w-[1300px] mx-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
             <div>
-              <SectionLabel>What lastlook protects you from</SectionLabel>
-              <h2 className="text-[clamp(2rem,3.5vw,3.2rem)] font-bold text-ink font-headline leading-tight mb-5">
+              <SectionLabel>Application Risks</SectionLabel>
+              <h2 className="text-[clamp(2.5rem,5vw,4.5rem)] font-black text-ink font-headline leading-[0.95] mb-8 uppercase tracking-tighter">
                 Things that kill<br />applications.
               </h2>
-              <p className="text-[15px] text-ink-secondary leading-relaxed max-w-md">
-                The gaps that are obvious in hindsight — and easy to fix before submission. LastLook catches them while you still have time.
+              <p className="text-[18px] text-ink-secondary mb-10 leading-relaxed font-medium">
+                Reviewers look for reasons to say no. We give them reasons to say yes.
               </p>
+              <button onClick={handleStart} className="btn-primary px-8 py-4 rounded-xl">
+                Protect your submission
+              </button>
             </div>
-            <StaggeredReveal className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {PROBLEMS.map(({ icon: Icon, title, desc }) => (
-                <XRayCard key={title} className="card p-5 flex items-start gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-[var(--danger-soft)] flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <Icon className="w-5 h-5 text-[var(--danger)]" />
-                  </div>
-                  <div>
-                    <h3 className="text-[14px] font-semibold text-ink mb-1">{title}</h3>
-                    <p className="text-[12px] text-ink-secondary leading-relaxed">{desc}</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {PROBLEMS.map((prob, i) => (
+                <XRayCard key={prob.title} className="p-6 border-2 border-[var(--border)] hover:border-[var(--danger)] transition-colors">
+                  <div className="flex items-start gap-4">
+                    <div className="mt-1 p-2 rounded-lg bg-[var(--danger-soft)]">
+                      <prob.icon className="w-5 h-5 text-[var(--danger)]" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-ink mb-2 text-[16px]">{prob.title}</h4>
+                      <p className="text-[13px] text-ink-secondary leading-relaxed">{prob.desc}</p>
+                    </div>
                   </div>
                 </XRayCard>
               ))}
-            </StaggeredReveal>
+            </div>
           </div>
         </div>
-      </AnimatedSection>
+      </section>
 
-      {/* ─── REVIEWER LINEUP ───────────────────────────────────────── */}
-      <AnimatedSection className="mb-24 md:mb-32 px-4">
-        <div className="max-w-[1100px] mx-auto">
-          <div className="text-center mb-14">
-            <SectionLabel>Your application review lineup</SectionLabel>
-            <h2 className="text-[clamp(1.8rem,3.5vw,3rem)] font-bold text-ink font-headline">
-              Seven specialist agents. One mission.
+      {/* ─── REVIEWER LINEUP ──────────────────────────────────────── */}
+      <section className="py-32 px-6 bg-[var(--surface-3)]">
+        <div className="max-w-[1300px] mx-auto">
+          <div className="text-center mb-20">
+            <SectionLabel>The Reviewer Panel</SectionLabel>
+            <h2 className="text-[clamp(2.5rem,5vw,4.5rem)] font-black text-ink font-headline uppercase tracking-tighter leading-none">
+              Your Review Lineup.
             </h2>
-            <p className="text-[15px] text-ink-secondary mt-3 max-w-lg mx-auto">
-              Each reviewer focuses on one dimension. Together, they cover every angle that matters.
+            <p className="text-[18px] text-ink-secondary mt-6 max-w-2xl mx-auto font-medium">
+              Seven specialist agents inspecting every angle of your application.
             </p>
           </div>
-          <StaggeredReveal className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {AGENTS.map(({ name, specialty, desc, icon: Icon }) => (
-              <XRayCard key={name} className="card p-6 group">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="w-12 h-12 rounded-2xl bg-[var(--accent-soft)] flex items-center justify-center flex-shrink-0 group-hover:bg-[var(--accent)] group-hover:text-white transition-all duration-300">
-                    <Icon className="w-6 h-6" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {AGENTS.map((agent, i) => (
+              <motion.div
+                key={agent.name}
+                initial={{ opacity: 0, scale: 0.95 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.1 }}
+                className="card p-8 bg-[var(--surface)] border-2 border-[var(--border)] group hover:border-[var(--accent)] transition-all"
+              >
+                <div className="flex justify-between items-start mb-6">
+                  <div className="p-3 rounded-2xl bg-[var(--accent-soft)] text-[var(--accent)]">
+                    <agent.icon className="w-6 h-6" />
                   </div>
-                  <span className="font-mono text-[10px] text-ink-muted uppercase tracking-widest mt-1">{specialty}</span>
+                  <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-ink-muted bg-[var(--bg)] px-2 py-1 rounded">
+                    {agent.specialty}
+                  </span>
                 </div>
-                <h3 className="text-[15px] font-bold text-ink mb-2 font-mono tracking-tight">{name}</h3>
-                <p className="text-[12px] text-ink-secondary leading-relaxed">{desc}</p>
-              </XRayCard>
+                <h3 className="text-[20px] font-bold text-ink mb-3">{agent.name}</h3>
+                <p className="text-[14px] text-ink-secondary leading-relaxed">{agent.desc}</p>
+              </motion.div>
             ))}
-          </StaggeredReveal>
+          </div>
         </div>
-      </AnimatedSection>
+      </section>
 
       {/* ─── PREPARE YOUR SUBMISSION ─────────────────────────────── */}
-      <AnimatedSection className="mb-24 md:mb-32 px-4">
-        <div className="max-w-[1100px] mx-auto">
-          <div className="text-center mb-14">
-            <SectionLabel>Prepare your submission</SectionLabel>
-            <h2 className="text-[clamp(1.8rem,3.5vw,3rem)] font-bold text-ink font-headline">
-              Get your materials ready.
-            </h2>
-            <p className="text-[15px] text-ink-secondary mt-3 max-w-lg mx-auto">
-              The best reviews start with good inputs. Save your context once, use it everywhere.
+      <section className="py-32 px-6 bg-[var(--surface)]">
+        <div className="max-w-[1300px] mx-auto">
+          <div className="flex flex-col md:flex-row justify-between items-end mb-20 gap-8">
+            <div className="max-w-2xl">
+              <SectionLabel>Practical Prep</SectionLabel>
+              <h2 className="text-[clamp(2.5rem,5vw,4.5rem)] font-black text-ink font-headline uppercase tracking-tighter leading-none">
+                Prepare your<br />submission.
+              </h2>
+            </div>
+            <p className="text-[18px] text-ink-secondary font-medium md:text-right">
+              Don't leave your best work to chance.<br />Build a foundation that wins.
             </p>
           </div>
-          <StaggeredReveal className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            {PREP_CARDS.map(({ icon: Icon, title, desc }) => (
-              <XRayCard key={title} className="card p-7 group">
-                <div className="w-14 h-14 rounded-2xl bg-[var(--surface-2)] border border-edge flex items-center justify-center mb-5 group-hover:border-[var(--accent)]/30 group-hover:shadow-glow transition-all duration-300">
-                  <Icon className="w-6 h-6 text-[var(--accent)]" />
-                </div>
-                <h3 className="text-[16px] font-bold text-ink mb-2 font-headline">{title}</h3>
-                <p className="text-[13px] text-ink-secondary leading-relaxed">{desc}</p>
-              </XRayCard>
-            ))}
-          </StaggeredReveal>
-        </div>
-      </AnimatedSection>
-
-      {/* ─── APPLICATION IMPROVEMENT EXPERIENCES ───────────────────── */}
-      <AnimatedSection className="mb-24 md:mb-32 px-4">
-        <div className="max-w-[1100px] mx-auto">
-          <div className="text-center mb-14">
-            <SectionLabel>Everything your application goes through</SectionLabel>
-            <h2 className="text-[clamp(1.8rem,3.5vw,3rem)] font-bold text-ink font-headline">
-              Application improvement experiences.
-            </h2>
-            <p className="text-[15px] text-ink-secondary mt-3 max-w-lg mx-auto">
-              Every step your answer takes on its way from rough draft to submission-ready.
-            </p>
-          </div>
-          <StaggeredReveal className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {EXPERIENCES.map(({ icon: Icon, title, desc }) => (
-              <XRayCard key={title} className="card p-6 flex items-start gap-4 group">
-                <div className="w-11 h-11 rounded-xl bg-[var(--surface-2)] border border-edge flex items-center justify-center flex-shrink-0 group-hover:border-[var(--accent)]/30 transition-all duration-300">
-                  <Icon className="w-5 h-5 text-[var(--accent)]" />
-                </div>
-                <div>
-                  <h3 className="text-[14px] font-semibold text-ink mb-1">{title}</h3>
-                  <p className="text-[12px] text-ink-secondary leading-relaxed">{desc}</p>
-                </div>
-              </XRayCard>
-            ))}
-          </StaggeredReveal>
-        </div>
-      </AnimatedSection>
-
-      {/* ─── APPLICATION PACKET PREVIEW ────────────────────────────── */}
-      <AnimatedSection className="mb-24 md:mb-32 px-4">
-        <div className="max-w-[1100px] mx-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-            <div>
-              <SectionLabel>Application packet</SectionLabel>
-              <h2 className="text-[clamp(2rem,3.5vw,3.2rem)] font-bold text-ink font-headline leading-tight mb-5">
-                Everything in one<br />exportable packet.
-              </h2>
-              <p className="text-[15px] text-ink-secondary leading-relaxed max-w-md mb-6">
-                When the review is done, you get a copy-ready packet: program name, final answers, requirement checklist, link checklist, next best edit, and export status.
-              </p>
-              <ul className="space-y-3">
-                {['Program name and application type', 'Final answers with requirement checklist', 'Required links and link vault check', 'Next best edit and fix plan', 'Exportable markdown packet'].map((item) => (
-                  <li key={item} className="flex items-center gap-3 text-[14px] text-ink-secondary">
-                    <CheckCircle2 className="w-4 h-4 text-ok flex-shrink-0" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <motion.div
-              initial={{ opacity: 0, x: 30 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6 }}
-              className="relative"
-            >
-              <div className="card p-6 md:p-8 space-y-5">
-                <div className="flex items-center gap-3 pb-5 border-b border-edge">
-                  <div className="w-10 h-10 rounded-xl bg-[var(--accent-soft)] flex items-center justify-center">
-                    <Package className="w-5 h-5 text-[var(--accent)]" />
-                  </div>
-                  <div>
-                    <div className="text-[14px] font-bold text-ink">Founders Fellowship 2026</div>
-                    <div className="text-[11px] text-ink-muted">Fellowship · Ready with minor edits</div>
-                  </div>
-                </div>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between text-[13px]">
-                    <span className="text-ink-secondary">Readiness score</span>
-                    <span className="font-bold text-ink">84/100</span>
-                  </div>
-                  <div className="flex items-center justify-between text-[13px]">
-                    <span className="text-ink-secondary">Requirements</span>
-                    <span className="font-medium text-ok">4/5 covered</span>
-                  </div>
-                  <div className="flex items-center justify-between text-[13px]">
-                    <span className="text-ink-secondary">Links</span>
-                    <span className="font-medium text-warn">1 missing</span>
-                  </div>
-                  <div className="flex items-center justify-between text-[13px]">
-                    <span className="text-ink-secondary">Next best edit</span>
-                    <span className="font-medium text-ink">Add public link</span>
-                  </div>
-                </div>
-                <div className="pt-4 border-t border-edge">
-                  <div className="text-[11px] font-mono text-ink-muted uppercase tracking-widest mb-2">Export</div>
-                  <div className="flex gap-2">
-                    <span className="px-2.5 py-1 rounded-lg bg-[var(--surface-2)] border border-edge text-[11px] text-ink-secondary">Markdown</span>
-                    <span className="px-2.5 py-1 rounded-lg bg-[var(--surface-2)] border border-edge text-[11px] text-ink-secondary">Copy</span>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        </div>
-      </AnimatedSection>
-
-      {/* ─── FINAL CTA ─────────────────────────────────────────────── */}
-      <AnimatedSection className="px-4 mb-16">
-        <div className="max-w-[960px] mx-auto">
-          <div className="relative rounded-3xl overflow-hidden border border-edge shadow-soft">
-            <div aria-hidden className="pointer-events-none absolute inset-0">
-              <SpectraNoise className="opacity-30" />
-              <div className="absolute -top-24 left-1/2 h-[400px] w-[400px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(var(--accent-rgb),0.12),transparent_70%)] blur-3xl" />
-            </div>
-            <div className="relative p-10 sm:p-14 md:p-16 text-center">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[var(--accent-soft)] mb-6">
-                <Rocket className="w-8 h-8 text-[var(--accent)]" />
-              </div>
-              <h2 className="text-[clamp(1.8rem,4vw,3rem)] font-extrabold text-ink font-display leading-tight mb-4">
-                Run your LastLook<br className="hidden sm:block" /> before you submit.
-              </h2>
-              <p className="text-[15px] text-ink-secondary leading-relaxed mb-8 max-w-lg mx-auto">
-                Applications, fellowships, grants, video scripts — anything where the brief matters and the stakes are real.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                <button onClick={handleStart} className="btn-primary text-[15px] px-8 py-3.5">
-                  <Zap className="w-[17px] h-[17px]" />
-                  Start your review
-                </button>
-                <button onClick={handleWalkthrough} className="btn-ghost text-[14px] px-6 py-3">
-                  <Sparkles className="w-[14px] h-[14px]" />
-                  Try sample
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {PREP_CARDS.map((card, i) => (
+              <div key={card.title} className="p-8 rounded-3xl bg-[var(--surface-2)] border-2 border-[var(--border)] hover:bg-[var(--bg)] transition-all cursor-default group">
+                <card.icon className="w-10 h-10 text-[var(--accent)] mb-6 group-hover:scale-110 transition-transform" />
+                <h3 className="text-[20px] font-bold text-ink mb-3">{card.title}</h3>
+                <p className="text-[15px] text-ink-secondary leading-relaxed mb-6">{card.desc}</p>
+                <button className="text-[var(--accent)] font-bold flex items-center gap-2 text-[14px] uppercase tracking-wider">
+                  Learn more <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
-            </div>
+            ))}
           </div>
         </div>
-      </AnimatedSection>
+      </section>
+
+      {/* ─── FINAL CTA ────────────────────────────────────────────── */}
+      <section className="py-40 px-6 relative overflow-hidden bg-[var(--accent)]">
+        <div className="absolute inset-0 opacity-20">
+          <SpectraNoise />
+        </div>
+        <div className="relative max-w-[1000px] mx-auto text-center">
+          <h2 className="text-[clamp(3rem,8vw,7rem)] font-black text-white font-headline uppercase tracking-tighter leading-[0.85] mb-12">
+            Run your LastLook<br />before you submit.
+          </h2>
+          <button onClick={handleStart} className="bg-white text-[var(--accent)] text-[20px] font-black px-12 py-6 rounded-2xl shadow-lift hover:scale-105 transition-transform uppercase tracking-tight">
+            Start your review now
+          </button>
+        </div>
+      </section>
+      
+      <style>{`
+        @keyframes move {
+          0% { left: 0%; opacity: 0; }
+          10% { opacity: 1; }
+          90% { opacity: 1; }
+          100% { left: 100%; opacity: 0; }
+        }
+      `}</style>
     </div>
   );
 }

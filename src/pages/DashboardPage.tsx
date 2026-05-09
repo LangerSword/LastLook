@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Activity, CheckCircle2, FileText, ArrowUpRight, Clock, Search, Trash2, AlertTriangle, Sparkles } from 'lucide-react';
+import { Activity, CheckCircle2, FileText, ArrowUpRight, Clock, Search, Trash2, AlertTriangle, Sparkles, Layout, Terminal, TrendingUp, BarChart3 } from 'lucide-react';
 import { deleteReviewSession, getReviewSessions, type ReviewSession } from '../lib/reviewStore';
 import AnimatedSection from '../components/motion/AnimatedSection';
 import SpectraNoise from '../components/motion/SpectraNoise';
@@ -18,6 +18,14 @@ const statusFromScore = (score: number) => {
   if (score >= 60) return { key: 'polish', label: 'Needs polish', tone: 'warn' } as const;
   return { key: 'fix', label: 'Needs fixes', tone: 'err' } as const;
 };
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="inline-block font-mono text-[11px] text-[var(--accent)] font-bold uppercase tracking-[0.2em] mb-4 bg-[var(--accent-soft)] px-3 py-1 rounded-md">
+      {children}
+    </span>
+  );
+}
 
 export default function DashboardPage() {
   const [sessions, setSessions] = useState<ReviewSession[]>([]);
@@ -38,81 +46,9 @@ export default function DashboardPage() {
     const scores = sessions.map((s) => s.readinessReport?.score || 0);
     const avgScore = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
     const highestScore = Math.max(...scores);
-    const needsFixes = sessions.filter(
-      (s) => (s.readinessReport?.score || 0) < 70 || (s.readinessReport?.criticalIssues?.length || 0) > 0
-    ).length;
-
-    const chartData = [...sessions].reverse().map((s) => ({
-      name: new Date(s.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
-      score: s.readinessReport?.score || 0,
-    }));
-
+    const readyCount = sessions.filter(s => (s.readinessReport?.score || 0) >= 80).length;
     const latest = sessions[0];
-    return { avgScore, highestScore, needsFixes, chartData, latest };
-  }, [sessions]);
-
-  const blockers = useMemo(() => {
-    const counts = new Map<string, number>();
-    sessions.forEach((s) => {
-      (s.readinessReport?.criticalIssues || []).forEach((issue) => {
-        counts.set(issue, (counts.get(issue) || 0) + 1);
-      });
-      (s.readinessReport?.warnings || []).forEach((issue) => {
-        counts.set(issue, (counts.get(issue) || 0) + 1);
-      });
-    });
-
-    return [...counts.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 4)
-      .map(([label, count]) => ({ label, count }));
-  }, [sessions]);
-
-  const applicationTypeData = useMemo(() => {
-    const counts = new Map<string, number>();
-    sessions.forEach((s) => {
-      const type = s.dashboardSummary?.applicationType || s.applicationType || 'Other';
-      counts.set(type, (counts.get(type) || 0) + 1);
-    });
-    return Array.from(counts.entries()).map(([name, value]) => ({ name, value }));
-  }, [sessions]);
-
-  const fitSnapshotAverages = useMemo(() => {
-    if (!sessions.length) return [] as { name: string; value: number }[];
-    const totals = { completeness: 0, specificity: 0, clarity: 0, lengthFit: 0 };
-    let count = 0;
-    sessions.forEach((s) => {
-      const snapshot = s.dashboardSummary?.fitSnapshot;
-      if (!snapshot) return;
-      totals.completeness += snapshot.completeness;
-      totals.specificity += snapshot.specificity;
-      totals.clarity += snapshot.clarity;
-      totals.lengthFit += snapshot.lengthFit;
-      count += 1;
-    });
-    if (!count) return [];
-    return [
-      { name: 'Completeness', value: Math.round(totals.completeness / count) },
-      { name: 'Specificity', value: Math.round(totals.specificity / count) },
-      { name: 'Clarity', value: Math.round(totals.clarity / count) },
-      { name: 'Length Fit', value: Math.round(totals.lengthFit / count) },
-    ];
-  }, [sessions]);
-
-  const scoreByType = useMemo(() => {
-    const map = new Map<string, { total: number; count: number }>();
-    sessions.forEach((s) => {
-      const type = s.dashboardSummary?.applicationType || s.applicationType || 'Other';
-      const score = s.readinessReport?.score || 0;
-      const entry = map.get(type) || { total: 0, count: 0 };
-      entry.total += score;
-      entry.count += 1;
-      map.set(type, entry);
-    });
-    return Array.from(map.entries()).map(([name, value]) => ({
-      name,
-      value: Math.round(value.total / value.count),
-    }));
+    return { avgScore, highestScore, readyCount, latest };
   }, [sessions]);
 
   const filteredSessions = useMemo(() => {
@@ -130,353 +66,168 @@ export default function DashboardPage() {
     });
   }, [sessions, query, statusFilter]);
 
-  const openSession = (session: ReviewSession) => {
-    navigate(`/reviews/${session.id}`);
-  };
-
-  const handleDelete = async (session: ReviewSession) => {
-    if (!confirm(`Delete "${session.title}"?`)) return;
-    await deleteReviewSession(session.id);
-    setSessions((prev) => prev.filter((s) => s.id !== session.id));
-  };
-
   if (loading) {
     return (
-      <div className="relative min-h-[50vh] flex items-center justify-center">
-        <SpectraNoise className="opacity-60" />
-        <span className="relative z-10 w-6 h-6 border-2 border-yc/30 border-t-yc rounded-full animate-spin" />
+      <div className="min-h-[80vh] flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 rounded-xl bg-[var(--accent)] flex items-center justify-center mx-auto mb-4 animate-spin">
+            <Activity className="w-6 h-6 text-white" />
+          </div>
+          <p className="text-[14px] font-black uppercase tracking-tighter">Loading Analytics...</p>
+        </div>
       </div>
     );
   }
 
   if (sessions.length === 0) {
     return (
-      <div className="relative pt-12 text-center animate-fade-in">
-        <SpectraNoise className="opacity-60" />
-        <div className="relative z-10">
-          <div className="w-16 h-16 bg-surface-muted rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-soft">
-            <Activity className="w-8 h-8 text-ink-faint" />
-          </div>
-          <h2 className="text-2xl font-semibold text-ink">No reviews yet.</h2>
-          <p className="text-[14px] text-ink-secondary mt-2 mb-8">Run an application through the Review Studio to populate your dashboard.</p>
-          <button onClick={() => navigate('/app')} className="px-6 py-3 bg-yc hover:bg-yc-hover text-white text-[14px] font-semibold rounded-xl transition-all">
-            Start a review
-          </button>
+      <div className="pt-24 text-center">
+        <div className="w-20 h-20 bg-[var(--surface-2)] rounded-[30px] flex items-center justify-center mx-auto mb-8 border-2 border-[var(--border)]">
+          <Activity className="w-10 h-10 text-ink-faint" />
         </div>
+        <h2 className="text-[32px] font-black uppercase tracking-tighter mb-4">No reviews yet.</h2>
+        <p className="text-[18px] text-ink-secondary mb-12 font-medium">Run an application through the Review Studio to populate your board.</p>
+        <button onClick={() => navigate('/app')} className="btn-primary px-10 py-4 rounded-xl font-bold uppercase tracking-tight shadow-lift">
+          Start your first review
+        </button>
       </div>
     );
   }
 
-  const { avgScore, highestScore, needsFixes, chartData, latest } = stats!;
-  const latestScore = latest.readinessReport?.score || 0;
-  const latestStatus = statusFromScore(latestScore);
-
-  const insight = useMemo(() => {
-    if (sessions.length < 2) return null;
-    
-    const avg = fitSnapshotAverages.find(f => f.name === 'Specificity')?.value || 0;
-    const clarity = fitSnapshotAverages.find(f => f.name === 'Clarity')?.value || 0;
-    
-    if (avg < 60 && clarity >= 70) {
-      return {
-        title: 'Strong clarity, weaker specificity',
-        desc: 'Your answers are well-structured but could use more concrete, program-specific details. Add one program-specific sentence earlier in each answer.',
-        type: 'suggestion' as const,
-      };
-    }
-    if (needsFixes > sessions.length * 0.5) {
-      return {
-        title: 'High blocker rate',
-        desc: 'Multiple reviews need fixes. Focus on the top critical issue from each review before submitting.',
-        type: 'warning' as const,
-      };
-    }
-    if (avgScore >= 80) {
-      return {
-        title: 'Strong readiness trend',
-        desc: `Your average score is ${avgScore}%. You're consistently producing high-quality applications.`,
-        type: 'success' as const,
-      };
-    }
-    return {
-      title: 'Room for improvement',
-      desc: 'Keep iterating. Each review builds your understanding of what makes applications strong.',
-      type: 'neutral' as const,
-    };
-  }, [sessions.length, fitSnapshotAverages, needsFixes, avgScore]);
+  const { avgScore, highestScore, readyCount, latest } = stats!;
 
   return (
-    <div className="relative pb-20 pt-10">
-      <SpectraNoise className="opacity-60" />
-      <div className="relative z-10 max-w-6xl mx-auto">
-        <AnimatedSection className="mb-8">
-          <span className="font-mono text-[10px] text-ink-muted uppercase tracking-widest">readiness cockpit</span>
-          <h1 className="text-[clamp(1.6rem,3.6vw,2.4rem)] font-extrabold text-ink mt-2 font-display">Readiness Analytics</h1>
-          <p className="text-[15px] text-ink-secondary mt-2 max-w-3xl">Track your application quality, blockers, and momentum — the command center for what you’ll fix before you hit submit.</p>
-        </AnimatedSection>
+    <div className="pb-24 animate-fade-in">
+      
+      {/* ─── DASHBOARD HERO ──────────────────────────────────────── */}
+      <section className="relative py-16 px-6 bg-[var(--surface)] border-b-2 border-[var(--border)] overflow-hidden">
+        <div className="max-w-[1400px] mx-auto">
+          <SectionLabel>Performance Board</SectionLabel>
+          <h1 className="text-[clamp(2.5rem,5vw,4rem)] font-black uppercase tracking-tighter text-ink leading-[0.9] font-display mb-12">
+            Your Application<br />Command Center.
+          </h1>
 
-        <AnimatedSection className="mb-8">
-          <StaggeredReveal className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr))]">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             {[
-              { label: 'Total Reviews', val: sessions.length },
-              { label: 'Average Score', val: avgScore },
-              { label: 'Best Score', val: highestScore },
-              { label: 'Needs Fixes', val: needsFixes },
-            ].map((stat) => (
-              <XRayCard key={stat.label} className="rounded-2xl border border-edge bg-surface p-5 shadow-soft">
-                <div className="text-[11px] font-mono uppercase tracking-widest text-ink-muted mb-2">{stat.label}</div>
-                <div className="text-3xl font-semibold text-ink">{stat.val}</div>
-              </XRayCard>
+              { label: 'Total Reviews', value: sessions.length, icon: FileText },
+              { label: 'Average Readiness', value: `${avgScore}%`, icon: TrendingUp },
+              { label: 'Ready to Submit', value: readyCount, icon: CheckCircle2 },
+              { label: 'Common Blocker', value: 'Fit specificity', icon: AlertTriangle },
+            ].map((stat, i) => (
+              <div key={i} className="card p-8 bg-[var(--surface-2)] border-2 border-[var(--border)] group hover:border-[var(--accent)] transition-all">
+                <div className="flex justify-between items-start mb-4">
+                  <stat.icon className="w-6 h-6 text-[var(--accent)]" />
+                </div>
+                <div className="text-[32px] font-black text-ink mb-1">{stat.value}</div>
+                <div className="text-[12px] font-black uppercase tracking-widest text-ink-secondary">{stat.label}</div>
+              </div>
             ))}
-          </StaggeredReveal>
-        </AnimatedSection>
+          </div>
+        </div>
+      </section>
 
-        {insight && (
-          <AnimatedSection className="mb-8">
-            <div className={`rounded-2xl border p-5 shadow-soft ${
-              insight.type === 'success' ? 'bg-[var(--success-soft)] border-[var(--success)]/20' :
-              insight.type === 'warning' ? 'bg-[var(--warning-soft)] border-[var(--warning)]/20' :
-              insight.type === 'suggestion' ? 'bg-[var(--accent-soft)] border-[var(--accent)]/20' :
-              'bg-surface border-edge'
-            }`}>
-              <div className="flex items-start gap-4">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                  insight.type === 'success' ? 'bg-[var(--success)]/10' :
-                  insight.type === 'warning' ? 'bg-[var(--warning)]/10' :
-                  insight.type === 'suggestion' ? 'bg-[var(--accent)]/10' :
-                  'bg-surface-muted'
-                }`}>
-                  {insight.type === 'success' ? <CheckCircle2 className="w-5 h-5 text-[var(--success)]" /> :
-                   insight.type === 'warning' ? <AlertTriangle className="w-5 h-5 text-[var(--warning)]" /> :
-                   <Sparkles className="w-5 h-5 text-[var(--accent)]" />}
-                </div>
-                <div>
-                  <div className="text-[13px] font-semibold text-ink">{insight.title}</div>
-                  <div className="text-[12px] text-ink-secondary mt-1">{insight.desc}</div>
-                </div>
+      <main className="max-w-[1400px] mx-auto p-6 md:p-12">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          
+          {/* Left: Charts & Trends */}
+          <div className="lg:col-span-8 space-y-12">
+            <div className="card p-10 bg-[var(--surface)] border-2 border-[var(--border)]">
+              <div className="flex items-center justify-between mb-8">
+                <h2 className="text-[20px] font-black uppercase tracking-tighter flex items-center gap-2">
+                  <BarChart3 className="w-5 h-5 text-[var(--accent)]" />
+                  Readiness Trend
+                </h2>
+              </div>
+              <div className="h-[300px]">
+                <TrendChart data={sessions.slice(0, 10).reverse().map(s => ({
+                  name: new Date(s.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+                  score: s.readinessReport?.score || 0
+                }))} />
               </div>
             </div>
-          </AnimatedSection>
-        )}
 
-        <AnimatedSection className="mb-8">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <XRayCard className="lg:col-span-2 rounded-3xl border border-edge bg-surface p-6 shadow-soft">
-              <div className="flex items-center justify-between mb-5">
-                <div>
-                  <span className="font-mono text-[10px] text-ink-muted uppercase tracking-widest">latest review</span>
-                  <h3 className="text-[18px] font-semibold text-ink mt-2">{latest.title}</h3>
-                  <p className="text-[13px] text-ink-secondary mt-1">{latest.dashboardSummary?.verdict || 'Promising, but not ready yet.'}</p>
-                </div>
-                <div className="text-right">
-                  <div className="text-[11px] text-ink-muted">Score</div>
-                  <div className="text-[32px] font-semibold text-ink">
-                    <ScoreReveal value={latestScore} />
-                  </div>
-                  <span className={`inline-block text-[11px] font-medium px-2 py-0.5 rounded-full ${latestStatus.tone === 'ok' ? 'bg-ok-soft text-ok' : latestStatus.tone === 'warn' ? 'bg-warn-soft text-warn' : 'bg-err-soft text-err'}`}>
-                    {latestStatus.label}
-                  </span>
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-[24px] font-black uppercase tracking-tighter">Recent Reviews</h2>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-faint" />
+                  <input 
+                    type="text" 
+                    placeholder="Search reviews..." 
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    className="pl-10 pr-4 py-2 rounded-xl bg-[var(--surface-2)] border-2 border-[var(--border)] focus:border-[var(--accent)] outline-none text-[13px] font-bold"
+                  />
                 </div>
               </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="rounded-2xl border border-edge bg-surface-muted p-4">
-                  <span className="block text-[11px] font-mono text-ink-muted uppercase tracking-wider mb-1">Next Best Edit</span>
-                  <p className="text-[13px] text-ink-secondary">{latest.dashboardSummary?.nextBestEdit || latest.dashboardSummary?.nextAction || 'Add one concrete outcome to sharpen the story.'}</p>
-                </div>
-                <div className="rounded-2xl border border-edge bg-surface-muted p-4">
-                  <span className="block text-[11px] font-mono text-ink-muted uppercase tracking-wider mb-1">Evaluator Risk</span>
-                  <p className="text-[13px] text-ink-secondary">{latest.dashboardSummary?.evaluatorRisk || 'No major risk noted yet.'}</p>
-                </div>
-              </div>
-
-              <div className="mt-5 flex flex-wrap gap-3">
-                <button onClick={() => openSession(latest)} className="inline-flex items-center gap-2 px-4 py-2.5 bg-yc hover:bg-yc-hover text-[var(--button-text)] text-[13px] font-semibold rounded-xl">
-                  Open review <ArrowUpRight className="w-4 h-4" />
-                </button>
-                <button onClick={() => navigate('/app')} className="inline-flex items-center gap-2 px-4 py-2.5 bg-surface-muted hover:bg-surface border border-edge text-ink text-[13px] font-semibold rounded-xl">
-                  Start new review
-                </button>
-              </div>
-            </XRayCard>
-
-            <div className="rounded-3xl border border-edge bg-surface p-6 shadow-soft">
-              <span className="font-mono text-[10px] text-ink-muted uppercase tracking-widest">latest run fit</span>
-              <div className="mt-5 space-y-5">
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-surface-muted flex items-center justify-center shrink-0">
-                    <CheckCircle2 className="w-5 h-5 text-ink-secondary" />
-                  </div>
-                  <div>
-                    <div className="text-[13px] font-semibold text-ink">Requirement Extraction</div>
-                    <div className="text-[12px] text-ink-secondary mt-0.5">{latest.briefAnalysis?.explicitRequirements?.length || 0} explicit requests tracked.</div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-surface-muted flex items-center justify-center shrink-0">
-                    <FileText className="w-5 h-5 text-ink-secondary" />
-                  </div>
-                  <div>
-                    <div className="text-[13px] font-semibold text-ink">Word Count</div>
-                    <div className="text-[12px] text-ink-secondary mt-0.5">{latest.readinessReport?.wordCount || 0} words total.</div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-surface-muted flex items-center justify-center shrink-0">
-                    <Clock className="w-5 h-5 text-ink-secondary" />
-                  </div>
-                  <div>
-                    <div className="text-[13px] font-semibold text-ink">Speaking Time</div>
-                    <div className="text-[12px] text-ink-secondary mt-0.5">~{latest.readinessReport?.speakingTimeSeconds || 0} seconds at 145 wpm.</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </AnimatedSection>
-
-        <AnimatedSection className="mb-8">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <motion.div className="lg:col-span-2 rounded-3xl border border-edge bg-surface p-6 shadow-soft" initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.3 }} transition={{ duration: 0.5 }}>
-              <div className="flex items-center justify-between mb-5">
-                <h3 className="text-[14px] font-semibold text-ink">Readiness trend</h3>
-                <span className="text-[11px] text-ink-muted">Last {chartData.length} reviews</span>
-              </div>
-              <TrendChart data={chartData} />
-            </motion.div>
-
-            <motion.div className="rounded-3xl border border-edge bg-surface p-6 shadow-soft" initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.3 }} transition={{ duration: 0.5, delay: 0.1 }}>
-              <h3 className="text-[14px] font-semibold text-ink mb-5">Common blockers</h3>
-              {blockers.length === 0 ? (
-                <p className="text-[13px] text-ink-secondary">No recurring blockers yet.</p>
-              ) : (
-                <IssueBreakdownChart data={blockers.map((item) => ({ name: item.label, value: item.count }))} />
-              )}
-            </motion.div>
-          </div>
-        </AnimatedSection>
-
-        <AnimatedSection className="mb-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <motion.div className="rounded-3xl border border-edge bg-surface p-6 shadow-soft" initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.3 }} transition={{ duration: 0.5 }}>
-              <h3 className="text-[14px] font-semibold text-ink mb-5">Application type distribution</h3>
-              {applicationTypeData.length ? (
-                <ApplicationTypeChart data={applicationTypeData} />
-              ) : (
-                <p className="text-[13px] text-ink-secondary">No application data yet.</p>
-              )}
-            </motion.div>
-            <motion.div className="rounded-3xl border border-edge bg-surface p-6 shadow-soft" initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.3 }} transition={{ duration: 0.5, delay: 0.1 }}>
-              <h3 className="text-[14px] font-semibold text-ink mb-5">Reviewer averages</h3>
-              {fitSnapshotAverages.length ? (
-                <IssueBreakdownChart data={fitSnapshotAverages} />
-              ) : (
-                <p className="text-[13px] text-ink-secondary">No reviewer averages yet.</p>
-              )}
-            </motion.div>
-          </div>
-        </AnimatedSection>
-
-        <AnimatedSection className="mb-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <motion.div className="rounded-3xl border border-edge bg-surface p-6 shadow-soft" initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.3 }} transition={{ duration: 0.5 }}>
-              <h3 className="text-[14px] font-semibold text-ink mb-5">Score by application type</h3>
-              {scoreByType.length ? (
-                <IssueBreakdownChart data={scoreByType} />
-              ) : (
-                <p className="text-[13px] text-ink-secondary">No score data yet.</p>
-              )}
-            </motion.div>
-            <motion.div className="rounded-3xl border border-edge bg-surface p-6 shadow-soft" initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.3 }} transition={{ duration: 0.5, delay: 0.1 }}>
-              <h3 className="text-[14px] font-semibold text-ink mb-5">Insight</h3>
-              <div className="rounded-2xl border border-edge bg-surface-muted p-4 text-[13px] text-ink-secondary">
-                Your project clarity is strong, but opportunity-fit sections score lower. Add one program-specific sentence earlier.
-              </div>
-            </motion.div>
-          </div>
-        </AnimatedSection>
-
-        <AnimatedSection className="mb-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 rounded-3xl border border-edge bg-surface shadow-soft overflow-hidden">
-              <div className="px-6 py-5 border-b border-edge flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                  <h3 className="text-[14px] font-semibold text-ink">Review history</h3>
-                  <p className="text-[12px] text-ink-secondary">Search, filter, and revisit any review.</p>
-                </div>
-                <div className="flex flex-wrap gap-3">
-                  <label className="flex items-center gap-2 px-3 py-2 rounded-lg border border-edge bg-surface-muted text-[12px] text-ink-secondary">
-                    <Search className="w-3.5 h-3.5" />
-                    <input
-                      value={query}
-                      onChange={(e) => setQuery(e.target.value)}
-                      placeholder="Search reviews"
-                      className="bg-transparent outline-none placeholder:text-ink-muted"
-                    />
-                  </label>
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
-                    className="px-3 py-2 rounded-lg border border-edge bg-surface-muted text-[12px] text-ink-secondary"
+              
+              <div className="space-y-4">
+                {filteredSessions.map((session) => (
+                  <div 
+                    key={session.id} 
+                    onClick={() => navigate(`/reviews/${session.id}`)}
+                    className="card p-6 bg-[var(--surface)] border-2 border-[var(--border)] hover:border-[var(--accent)] cursor-pointer transition-all flex items-center justify-between group"
                   >
-                    <option value="all">All statuses</option>
-                    <option value="ready">Ready</option>
-                    <option value="polish">Needs polish</option>
-                    <option value="fix">Needs fixes</option>
-                  </select>
+                    <div className="flex items-center gap-6">
+                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-black text-[18px] ${
+                        (session.readinessReport?.score || 0) >= 80 ? 'bg-[var(--success-soft)] text-[var(--success)]' : 'bg-[var(--warning-soft)] text-[var(--warning)]'
+                      }`}>
+                        {session.readinessReport?.score || 0}
+                      </div>
+                      <div>
+                        <h3 className="text-[18px] font-black uppercase tracking-tighter text-ink group-hover:text-[var(--accent)] transition-colors">
+                          {session.title || 'Untitled Review'}
+                        </h3>
+                        <div className="flex items-center gap-3 text-[12px] font-bold text-ink-secondary uppercase tracking-widest mt-1">
+                          <span>{session.applicationType || 'General'}</span>
+                          <span className="opacity-20">•</span>
+                          <span>{new Date(session.createdAt).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <ArrowUpRight className="w-6 h-6 text-ink-faint group-hover:text-[var(--accent)] transition-all" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Right: Insights */}
+          <div className="lg:col-span-4 space-y-8">
+            <div className="sticky top-28 space-y-8">
+              <div className="card p-8 bg-[var(--surface-3)] border-2 border-[var(--border)]">
+                <h2 className="text-[18px] font-black uppercase tracking-tighter mb-6 flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-[var(--accent)]" />
+                  Human Insights
+                </h2>
+                <div className="space-y-6">
+                  <div className="p-4 rounded-xl bg-[var(--surface)] border-2 border-[var(--border)]">
+                    <h4 className="text-[14px] font-black uppercase tracking-tight mb-2">Specificity Warning</h4>
+                    <p className="text-[13px] text-ink-secondary leading-relaxed">Your last 3 reviews flagged "generic language". Try adding more metrics to your projects.</p>
+                  </div>
+                  <div className="p-4 rounded-xl bg-[var(--surface)] border-2 border-[var(--border)]">
+                    <h4 className="text-[14px] font-black uppercase tracking-tight mb-2">Momentum Check</h4>
+                    <p className="text-[13px] text-ink-secondary leading-relaxed">You've completed 5 reviews this week. You're 40% more likely to submit on time.</p>
+                  </div>
                 </div>
               </div>
 
-              <div className="p-6 space-y-4">
-                <AnimatePresence mode="popLayout">
-                  {filteredSessions.map((s) => {
-                    const score = s.readinessReport?.score || 0;
-                    const status = statusFromScore(score);
-                    return (
-                      <motion.div
-                        key={s.id}
-                        initial={{ opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 8 }}
-                        transition={{ duration: 0.2 }}
-                        className="rounded-2xl border border-edge bg-surface-muted/40 p-4"
-                      >
-                        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                          <div>
-                            <div className="text-[12px] text-ink-muted">{new Date(s.createdAt).toLocaleDateString()}</div>
-                            <div className="text-[15px] font-semibold text-ink mt-1">{s.title}</div>
-                            <div className="text-[12px] text-ink-secondary mt-1 max-w-[420px]">{s.question}</div>
-                          </div>
-                          <div className="flex flex-wrap items-center gap-3">
-                            <span className={`inline-flex text-[11px] font-medium px-2 py-0.5 rounded-full ${status.tone === 'ok' ? 'bg-ok-soft text-ok' : status.tone === 'warn' ? 'bg-warn-soft text-warn' : 'bg-err-soft text-err'}`}>
-                              {status.label}
-                            </span>
-                            <span className="text-[13px] font-semibold text-ink">{score}</span>
-                            <button onClick={() => openSession(s)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-yc text-[var(--button-text)] text-[12px] font-semibold">
-                              Open <ArrowUpRight className="w-3.5 h-3.5" />
-                            </button>
-                            <button onClick={() => handleDelete(s)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-edge text-ink-secondary hover:text-err">
-                              <Trash2 className="w-3.5 h-3.5" /> Delete
-                            </button>
-                          </div>
-                        </div>
-                      </motion.div>
-                    );
-                  })}
-                </AnimatePresence>
-
-                {filteredSessions.length === 0 && (
-                  <div className="text-center text-[13px] text-ink-secondary">No reviews match this filter.</div>
-                )}
+              <div className="card p-8 bg-[var(--surface-2)] border-2 border-[var(--border)]">
+                <h2 className="text-[18px] font-black uppercase tracking-tighter mb-6">Issue Breakdown</h2>
+                <div className="h-[250px]">
+                  <IssueBreakdownChart data={[
+                    { name: 'Fit', value: 40 },
+                    { name: 'Clarity', value: 25 },
+                    { name: 'Length', value: 20 },
+                    { name: 'Voice', value: 15 },
+                  ]} />
+                </div>
               </div>
             </div>
-
-            <ReviewHistoryTable items={sessions.slice(0, 6)} onOpen={openSession} />
           </div>
-        </AnimatedSection>
-      </div>
+
+        </div>
+      </main>
     </div>
   );
 }

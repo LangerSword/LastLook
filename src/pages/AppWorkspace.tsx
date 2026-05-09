@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Sparkles, Play, ChevronDown, Zap, Brain, FileText, ScanLine, Pencil } from 'lucide-react';
+import { Sparkles, Play, ChevronDown, Zap, Brain, FileText, ScanLine, Pencil, ArrowRight, ClipboardCheck, Package, Layout, Terminal } from 'lucide-react';
 import type { ApplicationMemory, BriefAnalysis, GeneratedAnswer, CheckResult, ToneOption, LengthOption, ApplicationType, ReviewStrictness } from '../lib/types';
 import { getMemory, saveMemory } from '../lib/memoryStore';
 import { sampleProfile, sampleBrief, sampleQuestion, sampleWeakAnswer } from '../lib/sampleData';
@@ -15,6 +15,7 @@ import { buildTailoredDashboardSummary } from '../lib/dashboardSummary';
 import ReviewStepper from '../components/review/ReviewStepper';
 import { useUsage } from '../hooks/useUsage';
 import { useAuth } from '../contexts/AuthContext';
+import { motion, AnimatePresence } from 'framer-motion';
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
@@ -49,13 +50,13 @@ export default function AppWorkspace() {
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [saveError, setSaveError] = useState<string | null>(null);
   const [lastSavedId, setLastSavedId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'full' | 'tweak'>('full');
 
   const usage = useUsage();
   const { isAuthenticated, isDemoMode } = useAuth();
   
   const isFullReviewLimitHit = isAuthenticated && !isDemoMode && usage.fullReviewsUsed >= 5;
   const isIndividualLimitHit = isAuthenticated && !isDemoMode && usage.individualActionsUsed >= 15;
-  const limitMsg = "You’ve used today’s free review limit. You can still view saved reviews and edit drafts.";
 
   useEffect(() => {
     void (async () => {
@@ -63,56 +64,6 @@ export default function AppWorkspace() {
       setMemory(snapshot.memory);
     })();
   }, []);
-
-  useEffect(() => {
-    const storedType = localStorage.getItem('lastlook_default_app_type');
-    const storedStrictness = localStorage.getItem('lastlook_default_strictness');
-    if (storedType) setApplicationType(storedType as ApplicationType);
-    if (storedStrictness) setStrictness(storedStrictness as ReviewStrictness);
-  }, []);
-
-  useEffect(() => {
-    const active = localStorage.getItem('lastlook_active_session');
-    if (!active) return;
-    try {
-      const session = JSON.parse(active) as ReviewSession;
-      setBrief(session.brief || '');
-      setQuestion(session.question || '');
-      setFinalAnswer(session.finalAnswer || '');
-      setAnalysis(session.briefAnalysis || null);
-      setCheckResult(session.readinessReport || null);
-      if (session.generatedDraft) {
-        setGenerated({ draft: session.generatedDraft, whyItWorks: [], customize: [] });
-      }
-      setRunMode('step');
-      setSaveState('saved');
-    } catch {
-      // ignore malformed payloads
-    } finally {
-      localStorage.removeItem('lastlook_active_session');
-    }
-  }, []);
-
-  const handleDemo = async () => {
-    const saved = await saveMemory(sampleProfile);
-    setMemory(saved.memory);
-    setBrief(sampleBrief); setQuestion(sampleQuestion); setFinalAnswer(sampleWeakAnswer);
-    setProgramName('Founders Fellowship 2026');
-    setApplicationType('Fellowship');
-    setDeadline('');
-    setStrictness('Balanced');
-    setAnalysis(null); setGenerated(null); setCheckResult(null);
-    setLoadingState(null); setRunError(null);
-    setSaveState('idle'); setSaveError(null);
-    setLastSavedId(null);
-  };
-
-  const handleResetResults = () => {
-    setAnalysis(null); setGenerated(null); setCheckResult(null);
-    setLoadingState(null); setRunError(null);
-    setSaveState('idle'); setSaveError(null);
-    setLastSavedId(null);
-  };
 
   const handleRunFull = async () => {
     if (!brief.trim() || !question.trim()) {
@@ -136,7 +87,6 @@ export default function AppWorkspace() {
     setSaveError(null);
     
     try {
-      // 1-4
       const res = await runFullLastLook({
         brief,
         memory,
@@ -156,7 +106,6 @@ export default function AppWorkspace() {
       const draft = res.generatedAnswer.draft;
       const fAns = finalAnswer.trim() || draft;
 
-      // 5. Save review session
       setLoadingState({ active: true, stages, currentIdx: 7 });
       setSaveState('saving');
       const summary = buildTailoredDashboardSummary({
@@ -202,439 +151,191 @@ export default function AppWorkspace() {
     }
   };
 
-  const handleSaveSession = async () => {
-    if (!analysis || !checkResult) {
-      setRunError('Run a readiness check before saving.');
-      return;
-    }
-
-    const fAns = finalAnswer.trim() || generated?.draft || '';
-    if (!fAns) {
-      setRunError('Add a final answer before saving.');
-      return;
-    }
-
-    setRunError(null);
-    setSaveState('saving');
-    setSaveError(null);
-
-    try {
-      const summary = buildTailoredDashboardSummary({
-        memory,
-        briefAnalysis: analysis,
-        generatedAnswer: generated,
-        readinessReport: checkResult,
-        question,
-        finalAnswer: fAns,
-      });
-
-      const saved = await saveReviewSession({
-        title: programName || question.substring(0, 40) + '...',
-        brief,
-        question,
-        finalAnswer: fAns,
-        generatedDraft: generated?.draft,
-        briefAnalysis: analysis,
-        readinessReport: checkResult,
-        dashboardSummary: {
-          ...summary,
-          applicationType,
-          reviewStrictness: strictness,
-          programName,
-          deadline,
-        },
-      });
-      setSaveState(saved ? 'saved' : 'error');
-      if (saved) setLastSavedId(saved.id);
-    } catch (err) {
-      setSaveState('error');
-      setSaveError(err instanceof Error ? err.message : 'Save failed');
-    }
-  };
-
-  const handleFinalAnswerChange = (value: string) => {
-    setFinalAnswer(value);
-    if (checkResult) setCheckResult(null);
-    setSaveState('idle');
-    setSaveError(null);
-  };
-
-  const handleSaveSnippet = async (value: string) => {
-    if (!memory) return;
-    const updatedMemory = {
-      ...memory,
-      answerLibrary: [
-        ...memory.answerLibrary,
-        {
-          title: question.trim().slice(0, 60) || 'Saved answer snippet',
-          body: value,
-          tags: [applicationType.toLowerCase()],
-        },
-      ],
-    };
-    const saved = await saveMemory(updatedMemory);
+  const handleDemo = async () => {
+    const saved = await saveMemory(sampleProfile);
     setMemory(saved.memory);
+    setBrief(sampleBrief); setQuestion(sampleQuestion); setFinalAnswer(sampleWeakAnswer);
+    setProgramName('Founders Fellowship 2026');
+    setApplicationType('Fellowship');
+    setAnalysis(null); setGenerated(null); setCheckResult(null);
   };
-  const handleGenerated = (g: GeneratedAnswer) => {
-    setGenerated(g);
-    if (!finalAnswer.trim()) setFinalAnswer(g.draft);
-    if (checkResult) setCheckResult(null);
-    setSaveState('idle');
-    setSaveError(null);
-  };
-  const handleBriefChange = (value: string) => {
-    setBrief(value);
-    if (analysis) setAnalysis(null);
-    setSaveState('idle');
-    setSaveError(null);
-  };
-  const handleQuestionChange = (value: string) => {
-    setQuestion(value);
-    if (generated) setGenerated(null);
-    if (checkResult) setCheckResult(null);
-    if (loadingState) setLoadingState(null);
-    setSaveState('idle');
-    setSaveError(null);
-  };
-
-  const toggleReviewer = (id: string) => {
-    setSelectedReviewers((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
-    );
-  };
-
-  const handleCheckResultChange = (value: CheckResult | null) => {
-    setCheckResult(value);
-    setSaveState('idle');
-    setSaveError(null);
-  };
-
-  const activeStep = (() => {
-    if (checkResult) return 5;
-    if (loadingState?.active) return 4;
-    if (generated || finalAnswer.trim()) return 3;
-    if (brief.trim() || question.trim() || programName.trim()) return 1;
-    return 0;
-  })();
 
   return (
-    <div className="pb-20 pt-6 animate-fade-in">
-      {/* ─── WORKSPACE HEADER ───────────────────────────────────── */}
-      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between mb-8 gap-6">
-        <div>
-          <div className="flex items-center gap-3 mb-3">
-            <span className="font-mono text-[10px] text-ink-muted uppercase tracking-[0.14em]">application command center</span>
-            {isAuthenticated && !isDemoMode && (
-              <span className="px-2 py-0.5 rounded-full bg-ok-soft text-ok text-[10px] font-semibold">
-                {usage.fullReviewsUsed}/5 reviews today
-              </span>
-            )}
-          </div>
-          <h2 className="text-[clamp(1.6rem,2.8vw,2.2rem)] font-bold text-ink mt-1 font-headline">
-            Build a decision-ready review.
-          </h2>
-          <p className="text-[14px] text-ink-secondary mt-2 max-w-xl">
-            Configure the opportunity, bring your memory, and run the specialist reviewer panel.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3 p-1.5 bg-surface rounded-2xl border border-edge shadow-sm">
-          <button
-            onClick={() => setRunMode('full')}
-            className={`px-4 py-2 text-[12px] font-semibold rounded-xl transition-all ${runMode === 'full' ? 'bg-[var(--accent)] text-white shadow-md' : 'text-ink-secondary hover:text-ink hover:bg-surface-muted'}`}
-          >
-            <Sparkles className="w-3.5 h-3.5 inline mr-1.5" />
-            Full Review
-          </button>
-          <button
-            onClick={() => setRunMode('step')}
-            className={`px-4 py-2 text-[12px] font-semibold rounded-xl transition-all ${runMode === 'step' ? 'bg-[var(--accent)] text-white shadow-md' : 'text-ink-secondary hover:text-ink hover:bg-surface-muted'}`}
-          >
-            <Play className="w-3.5 h-3.5 inline mr-1.5" />
-            Step-by-step
-          </button>
-          <div className="w-px h-6 bg-edge mx-1" />
-          <button onClick={handleDemo} className="px-4 py-2 text-[12px] font-medium rounded-xl transition-colors text-ink-secondary hover:text-ink hover:bg-surface-muted">
-            Demo
-          </button>
-        </div>
-      </div>
-
-      {/* ─── STEP PROGRESS ──────────────────────────────────────── */}
-      <div className="mb-8">
-        <ReviewStepper
-          activeStep={activeStep}
-          steps={[
-            { title: 'Opportunity', description: 'Program, brief, deadline' },
-            { title: 'Memory', description: 'Profile, projects, links' },
-            { title: 'Answer', description: 'Draft or paste response' },
-            { title: 'Review', description: 'Run the reviewer panel' },
-            { title: 'Results', description: 'Fix plan + next best edit' },
-            { title: 'Packet', description: 'Export and submit' },
-          ]}
-        />
-      </div>
-
-      {/* ─── MAIN WORKSPACE GRID ────────────────────────────────── */}
-      <div className="workspace-grid">
-        {/* Left Column: Application Builder (~60%) */}
-        <div className="space-y-6">
-          {/* Opportunity Card */}
-          <div className="card p-6">
-            <div className="flex items-center justify-between mb-5">
-              <div>
-                <span className="font-mono text-[10px] text-ink-muted uppercase tracking-[0.14em]">Step 1</span>
-                <h3 className="text-[15px] font-bold text-ink mt-1">Opportunity Setup</h3>
-              </div>
-              <div className="w-8 h-8 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)]">
-                <Sparkles className="w-4 h-4" />
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <label className="text-[12px] text-ink-secondary">
-                Program name
-                <input
-                  value={programName}
-                  onChange={(e) => setProgramName(e.target.value)}
-                  placeholder="Founders Fellowship 2026"
-                  className="mt-2 w-full bg-[var(--surface-2)] border border-edge rounded-xl px-3 py-2.5 text-[13px] text-ink focus:border-[var(--accent)] focus:outline-none transition-colors"
-                />
-              </label>
-              <label className="text-[12px] text-ink-secondary">
-                Application type
-                <div className="relative mt-2">
-                  <select
-                    value={applicationType}
-                    onChange={(e) => setApplicationType(e.target.value as ApplicationType)}
-                    className="w-full bg-[var(--surface-2)] border border-edge rounded-xl px-3 py-2.5 text-[13px] text-ink appearance-none"
-                  >
-                    {['Fellowship', 'Hackathon', 'Internship', 'Accelerator', 'Scholarship', 'Club/community', 'Grant', 'Other'].map((type) => (
-                      <option key={type} value={type}>{type}</option>
-                    ))}
-                  </select>
-                  <ChevronDown className="w-4 h-4 text-ink-muted absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                </div>
-              </label>
-              <label className="text-[12px] text-ink-secondary md:col-span-2">
-                Deadline (optional)
-                <input
-                  value={deadline}
-                  onChange={(e) => setDeadline(e.target.value)}
-                  type="date"
-                  className="mt-2 w-full md:w-1/2 bg-[var(--surface-2)] border border-edge rounded-xl px-3 py-2.5 text-[13px] text-ink focus:border-[var(--accent)] focus:outline-none transition-colors"
-                />
-              </label>
-            </div>
-          </div>
-
-          {/* Memory Card — First Class */}
-          <div className="card p-6 border-[var(--accent)]/20">
-            <div className="flex items-center justify-between mb-5">
-              <div>
-                <span className="font-mono text-[10px] text-ink-muted uppercase tracking-[0.14em]">Step 2</span>
-                <h3 className="text-[15px] font-bold text-ink mt-1">Your Memory</h3>
-              </div>
-              <div className="w-8 h-8 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)]">
-                <Brain className="w-4 h-4" />
-              </div>
-            </div>
-            <p className="text-[13px] text-ink-secondary mb-4">
-              Save your profile, projects, achievements, and links. LastLook uses them to make feedback specific to you.
-            </p>
-            <MemoryPanel memory={memory} onMemoryChange={setMemory} />
-          </div>
-
-          {/* Brief + Question */}
-          <div className="card p-6">
-            <div className="flex items-center justify-between mb-5">
-              <div>
-                <span className="font-mono text-[10px] text-ink-muted uppercase tracking-[0.14em]">Step 3</span>
-                <h3 className="text-[15px] font-bold text-ink mt-1">Brief & Answer</h3>
-              </div>
-              <div className="w-8 h-8 rounded-lg bg-[var(--surface-2)] border border-edge flex items-center justify-center text-ink-muted">
-                <FileText className="w-4 h-4" />
-              </div>
-            </div>
-            <div className="space-y-5">
-              <BriefAnalyzer
-                brief={brief}
-                onBriefChange={handleBriefChange}
-                analysis={analysis}
-                onAnalysis={setAnalysis}
-                onStartLoading={() => setLoadingState({ active: true, stages: ['Requirement Reviewer is extracting the checklist'], currentIdx: 0 })}
-                onEndLoading={() => setLoadingState(null)}
-                disabled={isIndividualLimitHit}
-                disabledMessage={limitMsg}
-              />
-              <AnswerGenerator
-                memory={memory}
-                analysis={analysis}
-                question={question}
-                onQuestionChange={handleQuestionChange}
-                generated={generated}
-                onGenerated={handleGenerated}
-                tone={tone}
-                onToneChange={setTone}
-                targetLength={targetLength}
-                onLengthChange={setTargetLength}
-                applicationType={applicationType}
-                reviewStrictness={strictness}
-                onStartLoading={() => setLoadingState({ active: true, stages: ['Clarity Reviewer is checking structure', 'Length Reviewer is estimating word/time fit'], currentIdx: 0 })}
-                onEndLoading={() => setLoadingState(null)}
-                disabled={isIndividualLimitHit}
-                disabledMessage={limitMsg}
-              />
-            </div>
-          </div>
-
-          {/* Review Settings */}
-          <div className="card p-6">
-            <div className="flex items-center justify-between mb-5">
-              <div>
-                <span className="font-mono text-[10px] text-ink-muted uppercase tracking-[0.14em]">Step 4</span>
-                <h3 className="text-[15px] font-bold text-ink mt-1">Review Settings</h3>
-              </div>
-              <div className="w-8 h-8 rounded-lg bg-[var(--surface-2)] border border-edge flex items-center justify-center text-ink-muted">
-                <ScanLine className="w-4 h-4" />
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
-              <label className="text-[12px] text-ink-secondary">
-                Review strictness
-                <div className="relative mt-2">
-                  <select
-                    value={strictness}
-                    onChange={(e) => setStrictness(e.target.value as ReviewStrictness)}
-                    className="w-full bg-[var(--surface-2)] border border-edge rounded-xl px-3 py-2.5 text-[13px] text-ink appearance-none"
-                  >
-                    {['Gentle', 'Balanced', 'Brutal'].map((level) => (
-                      <option key={level} value={level}>{level}</option>
-                    ))}
-                  </select>
-                  <ChevronDown className="w-4 h-4 text-ink-muted absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                </div>
-              </label>
+    <div className="min-h-screen bg-[var(--bg)]">
+      {/* ─── WORKSPACE HEADER ────────────────────────────────────── */}
+      <header className="sticky top-0 z-30 bg-[var(--surface)] border-b-2 border-[var(--border)] px-6 py-4">
+        <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 rounded-xl bg-[var(--accent)] flex items-center justify-center shadow-lift">
+              <Terminal className="w-5 h-5 text-white" />
             </div>
             <div>
-              <div className="text-[12px] text-ink-secondary mb-2">Reviewer agents</div>
-              <div className="flex flex-wrap gap-2">
-                {[
-                  { id: 'requirements', label: 'Requirement' },
-                  { id: 'fit', label: 'Fit' },
-                  { id: 'clarity', label: 'Clarity' },
-                  { id: 'evidence', label: 'Evidence' },
-                  { id: 'length', label: 'Length' },
-                  { id: 'voice', label: 'Voice' },
-                  { id: 'risk', label: 'Risk' },
-                ].map((agent) => (
-                  <button
-                    key={agent.id}
-                    onClick={() => toggleReviewer(agent.id)}
-                    className={`px-3 py-1.5 rounded-full border text-[12px] font-medium transition-colors ${
-                      selectedReviewers.includes(agent.id)
-                        ? 'bg-yc-soft text-yc border-yc/30'
-                        : 'bg-[var(--surface-2)] text-ink-secondary border-edge'
-                    }`}
-                  >
-                    {agent.label}
-                  </button>
+              <h1 className="text-[18px] font-black uppercase tracking-tighter text-ink">Application Command Center</h1>
+              <div className="flex items-center gap-2 text-[12px] text-ink-secondary font-bold uppercase tracking-widest">
+                <span className={activeTab === 'full' ? 'text-[var(--accent)]' : ''}>Full Review</span>
+                <span className="opacity-20">/</span>
+                <span className={activeTab === 'tweak' ? 'text-[var(--accent)]' : ''}>Tweak Lab</span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-3">
+            <div className="flex p-1 bg-[var(--surface-2)] border-2 border-[var(--border)] rounded-xl">
+              <button 
+                onClick={() => setActiveTab('full')}
+                className={`px-4 py-2 rounded-lg text-[13px] font-bold transition-all ${activeTab === 'full' ? 'bg-[var(--accent)] text-white shadow-soft' : 'text-ink-secondary hover:text-ink'}`}
+              >
+                Full Review
+              </button>
+              <button 
+                onClick={() => setActiveTab('tweak')}
+                className={`px-4 py-2 rounded-lg text-[13px] font-bold transition-all ${activeTab === 'tweak' ? 'bg-[var(--accent)] text-white shadow-soft' : 'text-ink-secondary hover:text-ink'}`}
+              >
+                Tweak Lab
+              </button>
+            </div>
+            <button onClick={handleDemo} className="btn-secondary px-4 py-2 text-[13px] font-bold border-2">Load Demo</button>
+            <button 
+              onClick={handleRunFull} 
+              disabled={loadingState?.active}
+              className="btn-primary px-6 py-2 text-[13px] font-bold rounded-xl shadow-lift disabled:opacity-50"
+            >
+              {loadingState?.active ? 'Running Agents...' : 'Run LastLook'}
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-[1600px] mx-auto p-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          
+          {/* ─── LEFT PANEL: BUILDER ──────────────────────────────── */}
+          <div className="lg:col-span-7 space-y-6">
+            <AnimatePresence mode="wait">
+              {activeTab === 'full' ? (
+                <motion.div 
+                  key="full-review"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  className="space-y-6"
+                >
+                  {/* Timeline / Progress Rail */}
+                  <div className="card p-6 bg-[var(--surface)] border-2 border-[var(--border)]">
+                    <div className="flex items-center justify-between mb-8">
+                      <h2 className="text-[16px] font-black uppercase tracking-tighter flex items-center gap-2">
+                        <Layout className="w-4 h-4 text-[var(--accent)]" />
+                        Application Builder
+                      </h2>
+                      <span className="text-[11px] font-mono font-bold text-[var(--accent)] bg-[var(--accent-soft)] px-2 py-1 rounded">
+                        Step-by-step
+                      </span>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-4">
+                        <label className="text-[11px] font-black uppercase tracking-widest text-ink-secondary">Opportunity Brief</label>
+                        <textarea 
+                          value={brief}
+                          onChange={(e) => setBrief(e.target.value)}
+                          placeholder="Paste the program description or brief here..."
+                          className="w-full h-48 p-4 rounded-xl bg-[var(--surface-2)] border-2 border-[var(--border)] focus:border-[var(--accent)] outline-none transition-all text-[14px]"
+                        />
+                      </div>
+                      <div className="space-y-4">
+                        <label className="text-[11px] font-black uppercase tracking-widest text-ink-secondary">Application Question</label>
+                        <textarea 
+                          value={question}
+                          onChange={(e) => setQuestion(e.target.value)}
+                          placeholder="What question are you answering?"
+                          className="w-full h-48 p-4 rounded-xl bg-[var(--surface-2)] border-2 border-[var(--border)] focus:border-[var(--accent)] outline-none transition-all text-[14px]"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="card p-6 bg-[var(--surface)] border-2 border-[var(--border)]">
+                    <div className="flex items-center justify-between mb-6">
+                      <h2 className="text-[16px] font-black uppercase tracking-tighter flex items-center gap-2">
+                        <Pencil className="w-4 h-4 text-[var(--accent)]" />
+                        Final Answer Editor
+                      </h2>
+                    </div>
+                    <textarea 
+                      value={finalAnswer}
+                      onChange={(e) => setFinalAnswer(e.target.value)}
+                      placeholder="Write your final answer here or generate a draft..."
+                      className="w-full h-96 p-6 rounded-xl bg-[var(--surface-2)] border-2 border-[var(--border)] focus:border-[var(--accent)] outline-none transition-all text-[15px] leading-relaxed"
+                    />
+                  </div>
+                </motion.div>
+              ) : (
+                <motion.div 
+                  key="tweak-lab"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                >
+                  <TweakLab 
+                    answer={finalAnswer} 
+                    onUpdate={setFinalAnswer}
+                    memory={memory}
+                    brief={brief}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* ─── RIGHT PANEL: STUDIO ─────────────────────────────── */}
+          <div className="lg:col-span-5 space-y-6">
+            <div className="sticky top-28 space-y-6">
+              <ReviewStudio 
+                loading={loadingState} 
+                analysis={analysis}
+                generated={generated}
+                checkResult={checkResult}
+                onGenerated={handleGenerated}
+              />
+              
+              <MemoryPanel 
+                memory={memory} 
+                onUpdate={setMemory}
+                compact={true}
+              />
+            </div>
+          </div>
+
+        </div>
+      </main>
+      
+      {/* Loading Overlay inspired by Festivent checkmarks */}
+      <AnimatePresence>
+        {loadingState?.active && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--bg)]/90 backdrop-blur-md p-6"
+          >
+            <div className="max-w-md w-full text-center">
+              <div className="w-24 h-24 rounded-3xl bg-[var(--accent)] flex items-center justify-center mx-auto mb-8 shadow-glow animate-bounce">
+                <ScanLine className="w-12 h-12 text-white" />
+              </div>
+              <h2 className="text-[24px] font-black uppercase tracking-tighter mb-4">Agents are inspecting...</h2>
+              <div className="space-y-3">
+                {loadingState.stages.map((stage, i) => (
+                  <div key={i} className={`flex items-center gap-3 text-[14px] font-bold transition-all ${i === loadingState.currentIdx ? 'text-[var(--accent)] scale-105' : i < loadingState.currentIdx ? 'text-[var(--success)]' : 'text-ink-faint'}`}>
+                    {i < loadingState.currentIdx ? <CheckCircle2 className="w-4 h-4" /> : <div className={`w-4 h-4 rounded-full border-2 ${i === loadingState.currentIdx ? 'border-[var(--accent)] animate-spin border-t-transparent' : 'border-edge'}`} />}
+                    {stage}
+                  </div>
                 ))}
               </div>
             </div>
-          </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-          {/* Final Answer Editor */}
-          <LastLookChecker
-            analysis={analysis}
-            question={question}
-            finalAnswer={finalAnswer}
-            onFinalAnswerChange={handleFinalAnswerChange}
-            result={checkResult}
-            onResultChange={handleCheckResultChange}
-            applicationType={applicationType}
-            reviewStrictness={strictness}
-            onStartLoading={() => setLoadingState({ active: true, stages: ['Risk Reviewer is finding blockers', 'Building readiness dashboard'], currentIdx: 0 })}
-            onEndLoading={() => setLoadingState(null)}
-            disabled={isIndividualLimitHit}
-            disabledMessage={limitMsg}
-          />
-
-          {/* Run CTA */}
-          <div className="card p-6 bg-gradient-to-br from-surface to-[var(--accent-soft)]/30 border-[var(--accent)]/20">
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-[var(--accent)] flex items-center justify-center flex-shrink-0">
-                <Zap className="w-6 h-6 text-white" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="text-[16px] font-bold text-ink mb-1">Run Full LastLook</h3>
-                <p className="text-[13px] text-ink-secondary mb-4">
-                  Run all reviewer agents in one pass when your brief and answer are ready.
-                </p>
-                {isFullReviewLimitHit && (
-                  <div className="mb-4 p-3 rounded-xl bg-warn-soft text-warn text-[13px] border border-warn/20">{limitMsg}</div>
-                )}
-                <button
-                  onClick={handleRunFull}
-                  disabled={loadingState?.active || isFullReviewLimitHit}
-                  className="btn-primary text-[14px] px-6 py-3 disabled:opacity-50"
-                >
-                  <Zap className="w-4 h-4" />
-                  {loadingState?.active ? 'Running review panel...' : 'Run full LastLook'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Right Column: Review Studio (~40%) */}
-        <div className="flex flex-col gap-5 lg:sticky lg:top-6 self-start">
-          <ReviewStudio
-            analysis={analysis}
-            generated={generated}
-            checkResult={checkResult}
-            loadingState={loadingState}
-            error={runError}
-            onReset={handleResetResults}
-            memory={memory}
-            briefText={brief}
-            question={question}
-            finalAnswer={finalAnswer}
-            applicationType={applicationType}
-            reviewStrictness={strictness}
-            programName={programName}
-            deadline={deadline}
-            openReviewPath={lastSavedId ? `/reviews/${lastSavedId}` : undefined}
-            onSaveSession={handleSaveSession}
-            saveState={saveState}
-            saveError={saveError}
-          />
-
-          {/* Tweak Lab — visually separate */}
-          {(analysis || generated || checkResult || finalAnswer.trim()) && (
-            <div className="card p-6 border-[var(--accent)]/10">
-              <div className="flex items-center gap-3 mb-5">
-                <div className="w-8 h-8 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
-                  <Pencil className="w-4 h-4 text-[var(--accent)]" />
-                </div>
-                <div>
-                  <span className="font-mono text-[10px] text-ink-muted uppercase tracking-[0.14em]">Tweak Lab</span>
-                  <h3 className="text-[14px] font-bold text-ink">Targeted improvements</h3>
-                </div>
-              </div>
-              <TweakLab
-                memory={memory}
-                analysis={analysis}
-                question={question}
-                currentAnswer={finalAnswer || generated?.draft || ''}
-                applicationType={applicationType}
-                reviewStrictness={strictness}
-                onReplaceAnswer={handleFinalAnswerChange}
-                onSaveToLibrary={handleSaveSnippet}
-              />
-            </div>
-          )}
-        </div>
-      </div>
     </div>
   );
 }

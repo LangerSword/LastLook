@@ -14,6 +14,8 @@
   --bg-rgb: 253 247 237;
   --surface: #FFFFFF;
   --surface-rgb: 255 255 255;
+  --surface-2: #FFF8F2;
+  --surface-3: #FFF0E6;
   --surface-muted: #FFF4E6;
   --surface-muted-rgb: 255 244 230;
   --surface-raised: #FFFFFF;
@@ -85,6 +87,8 @@
   --bg-rgb: 10 13 20;
   --surface: #12161F;
   --surface-rgb: 18 22 31;
+  --surface-2: #11131A;
+  --surface-3: #181D28;
   --surface-muted: #181D28;
   --surface-muted-rgb: 24 29 40;
   --surface-raised: #1C2130;
