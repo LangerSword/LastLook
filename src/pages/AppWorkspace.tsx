@@ -72,14 +72,15 @@ export default function AppWorkspace() {
     }
     
     const stages = [
-      'Requirement Reviewer is extracting the checklist',
-      'Fit Reviewer is checking opportunity alignment',
-      'Clarity Reviewer is checking structure',
-      'Length Reviewer is estimating word/time fit',
-      'Voice Reviewer is checking consistency',
-      'Risk Reviewer is finding blockers',
-      'Building readiness dashboard',
-      'Saving review session',
+      'Parsing brief and extracting requirements',
+      'Building evidence bank from memory',
+      'Running deterministic checks',
+      'Computing requirement coverage',
+      'Running reviewer panel',
+      'Computing score',
+      'Building readiness report',
+      'Building application packet',
+      'Saving review',
     ];
     setLoadingState({ active: true, stages, currentIdx: 0 });
     setRunError(null);
@@ -99,7 +100,7 @@ export default function AppWorkspace() {
         programName,
         deadline,
       }, (step) => {
-        const map = { 1: 1, 2: 3, 3: 5, 4: 6 } as Record<number, number>;
+        const map: Record<number, number> = { 1: 0, 2: 1, 3: 2, 4: 3, 5: 4, 6: 5, 7: 6, 8: 7, 9: 8 };
         setLoadingState({ active: true, stages, currentIdx: map[step] ?? 0 });
       });
       
@@ -152,14 +153,12 @@ export default function AppWorkspace() {
   };
 
   const handleDemo = async () => {
-const handleDemo = async () => {
     const saved = await saveMemory(sampleProfile);
     setMemory(saved.memory);
     setBrief(sampleBrief); setQuestion(sampleQuestion); setFinalAnswer(sampleWeakAnswer);
     setProgramName('Founders Fellowship 2026');
     setApplicationType('Fellowship');
     setAnalysis(null); setGenerated(null); setCheckResult(null);
-  };
   };
 
   function handleGenerated(next: GeneratedAnswer) {

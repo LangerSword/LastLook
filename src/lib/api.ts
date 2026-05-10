@@ -162,6 +162,137 @@ export async function checkAnswer(params: {
   return normalizeCheckResponse(data, params.wordCount, params.speakingTimeSeconds);
 }
 
+interface StreamEvent {
+  type: string;
+  stage?: string;
+  durationMs?: number;
+  summary?: string;
+  error?: string;
+  resultMode?: string;
+  briefAnalysis?: unknown;
+  readinessReport?: unknown;
+  reviewerPanel?: unknown;
+  nextBestEdit?: unknown;
+  fixPlan?: unknown;
+  improvedApplication?: unknown;
+  debug?: unknown;
+}
+
+export async function runStreamingReview(
+  params: Record<string, unknown>,
+  onStage?: (event: StreamEvent) => void
+): Promise<FullRunResult> {
+  const headers = await getAuthHeaders();
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}/stream`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(params),
+    });
+  } catch (err) {
+    throw new Error('Could not reach the AI backend. Run npm run pages:dev for full local testing.');
+  }
+
+  if (!res.ok) {
+    throw new Error(`Backend error: ${res.status}`);
+  }
+
+  const reader = res.body?.getReader();
+  if (!reader) throw new Error('No response body');
+
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  let briefAnalysisData: unknown = null;
+  let readinessReportData: unknown = null;
+  let reviewerPanelData: unknown = null;
+  let nextBestEditData: unknown = null;
+  let fixPlanData: unknown = null;
+  let improvedApplicationData: unknown = null;
+  let debugData: unknown = null;
+  let finalResultMode = 'unknown';
+
+  const stagesCompleted: string[] = [];
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      try {
+        const event: StreamEvent = JSON.parse(line);
+
+        if (event.type === 'stream_started') {
+          finalResultMode = event.resultMode || 'unknown';
+          onStage?.(event);
+        } else if (event.type === 'stage_started' && event.stage) {
+          onStage?.(event);
+        } else if (event.type === 'stage_completed' && event.stage) {
+          stagesCompleted.push(event.stage);
+          onStage?.(event);
+        } else if (event.type === 'stage_failed' && event.stage) {
+          stagesCompleted.push(`${event.stage}_failed`);
+          onStage?.(event);
+        } else if (event.type === 'final_result') {
+          if (event.briefAnalysis) briefAnalysisData = event.briefAnalysis;
+          if (event.readinessReport) readinessReportData = event.readinessReport;
+          if (event.reviewerPanel) reviewerPanelData = event.reviewerPanel;
+          if (event.nextBestEdit) nextBestEditData = event.nextBestEdit;
+          if (event.fixPlan) fixPlanData = event.fixPlan;
+          if (event.improvedApplication) improvedApplicationData = event.improvedApplication;
+          if (event.debug) debugData = event.debug;
+          if (event.resultMode) finalResultMode = event.resultMode;
+          onStage?.(event);
+        } else if (event.type === 'error') {
+          throw new Error(`Stream error: ${event.error}`);
+        }
+      } catch (e) {
+        // skip malformed lines
+      }
+    }
+  }
+
+  const debugInfo = (debugData || {}) as Record<string, unknown>;
+
+  return {
+    briefAnalysis: briefAnalysisData ? normalizeAnalyzeResponse(briefAnalysisData) : {
+      explicitRequirements: [], impliedCriteria: [], submissionRisks: [], suggestedAngles: [], summary: '',
+    },
+    generatedAnswer: improvedApplicationData ? normalizeGenerateResponse({
+      draft: (improvedApplicationData as { improvedAnswer?: string; originalAnswer?: string }).originalAnswer || '',
+      whyItWorks: [], customize: [],
+    }) : { draft: '', whyItWorks: [], customize: [] },
+    readinessReport: readinessReportData ? normalizeCheckResponse(
+      readinessReportData as Parameters<typeof normalizeCheckResponse>[0],
+      150, 60
+    ) : {
+      score: 0, status: 'Unknown', criticalIssues: [], warnings: [], strongPoints: [], fixOrder: [],
+      wordCount: 0, speakingTimeSeconds: 0,
+    },
+    debug: {
+      inputHash: (params.inputHash as string) || '',
+      cacheHit: false,
+      providerUsed: (debugInfo.providerUsed as string) || finalResultMode,
+      stagesCompleted,
+      timings: [],
+      totalDurationMs: (debugInfo.totalDurationMs as number) || 0,
+    },
+    reviewerPanel: reviewerPanelData,
+    nextBestEdit: nextBestEditData,
+    fixPlan: fixPlanData,
+    improvedApplication: improvedApplicationData,
+    requirementCoverage: [],
+    debugFull: debugData,
+  };
+}
+
 export interface HealthResponse {
   ok: boolean;
   providers: Record<string, unknown>;
@@ -192,6 +323,33 @@ export interface FullRunResult {
   briefAnalysis: BriefAnalysis;
   generatedAnswer: GeneratedAnswer;
   readinessReport: CheckResult;
+  debug?: {
+    inputHash: string;
+    cacheHit: boolean;
+    providerUsed?: string;
+    fallbackUsed?: boolean;
+    isRealAI?: boolean;
+    temperature?: number;
+    topP?: number;
+    providerResponseTimeMs?: number;
+    totalDurationMs?: number;
+    apiDurationMs?: number;
+    stagesCompleted?: string[];
+    timings?: {
+      stage: string;
+      startTime: number;
+      endTime: number;
+      durationMs: number;
+      status: string;
+      error?: string;
+    }[];
+  };
+  reviewerPanel?: unknown;
+  nextBestEdit?: unknown;
+  fixPlan?: unknown;
+  improvedApplication?: unknown;
+  requirementCoverage?: unknown;
+  debugFull?: unknown;
 }
 
 export async function runFullLastLook(
@@ -207,20 +365,84 @@ export async function runFullLastLook(
     reviewStrictness?: string;
     programName?: string;
     deadline?: string;
+    forceRerun?: boolean;
   },
   onProgress?: (step: number) => void
 ): Promise<FullRunResult> {
+  const { hashReviewInput } = await import('../engine/hash/hashReviewInput');
+  const { getCachedReview, saveCachedReview, hasCachedReview } = await import('./reviewCache');
+
+  const inputForHash = {
+    opportunity: {
+      programName: params.programName,
+      applicationType: params.applicationType,
+      deadline: params.deadline,
+      targetFormat: params.target || 'written',
+      strictness: params.reviewStrictness || 'Balanced',
+    },
+    brief: params.brief,
+    answer: params.finalAnswer || '',
+    targetLength: params.targetLength,
+    memory: params.memory as ApplicationMemory | null,
+  };
+
+  const inputHash = await hashReviewInput(inputForHash);
+  const cacheHit = !params.forceRerun && hasCachedReview(inputHash);
+
+  if (cacheHit) {
+    const cached = getCachedReview(inputHash);
+    if (cached) {
+      return {
+        briefAnalysis: {
+          explicitRequirements: cached.briefAnalysis?.explicitRequirements || [],
+          impliedCriteria: cached.briefAnalysis?.hiddenRequirements || [],
+          submissionRisks: cached.briefAnalysis?.submissionRisks || [],
+          suggestedAngles: [],
+          summary: cached.briefAnalysis?.summary || '',
+        },
+        generatedAnswer: {
+          draft: cached.improvedApplication?.originalAnswer || '',
+          whyItWorks: [],
+          customize: [],
+        },
+        readinessReport: {
+          score: cached.readinessReport?.score || cached.applicationPacket?.overallScore || 0,
+          status: cached.readinessReport?.status || cached.applicationPacket?.status || 'Unknown',
+          criticalIssues: cached.readinessReport?.criticalIssues || [],
+          warnings: cached.readinessReport?.warnings || [],
+          strongPoints: cached.readinessReport?.strongPoints || [],
+          fixOrder: cached.readinessReport?.fixOrder || [],
+          wordCount: cached.readinessReport?.wordCount || 0,
+          speakingTimeSeconds: cached.readinessReport?.speakingTimeSeconds || 0,
+        },
+        debug: {
+          inputHash,
+          cacheHit: true,
+          providerUsed: 'cache',
+        },
+      };
+    }
+  }
+
   if (isLocalDemoMode()) {
+    const startTime = Date.now();
+
     if (onProgress) onProgress(1);
+    const stage1Start = Date.now();
     const briefAnalysis = await analyzeBrief(params.brief);
+    const stage1Duration = Date.now() - stage1Start;
+
     if (onProgress) onProgress(2);
+    const stage2Start = Date.now();
     const generatedAnswer = await generateAnswer({ ...params, briefAnalysis });
+    const stage2Duration = Date.now() - stage2Start;
+
     if (onProgress) onProgress(3);
+    const stage3Start = Date.now();
     const finalAnswerText = params.finalAnswer || generatedAnswer.draft;
     const wordCount = finalAnswerText.split(/\s+/).filter(Boolean).length;
     const speakingTimeSeconds = Math.round((wordCount / 145) * 60);
 
-    // Use deterministic engine for tailored demo output
     const packet = buildFullReviewPacket({
       briefAnalysis,
       answer: finalAnswerText,
@@ -233,6 +455,8 @@ export async function runFullLastLook(
       generatedAnswer,
       targetLength: params.targetLength,
     });
+    const stage3Duration = Date.now() - stage3Start;
+    const totalDuration = Date.now() - startTime;
 
     const readinessReport: CheckResult = {
       ...packet.readinessReport,
@@ -240,22 +464,124 @@ export async function runFullLastLook(
       speakingTimeSeconds,
     };
 
+    saveCachedReview(inputHash, packet);
+
     if (onProgress) onProgress(4);
-    return { briefAnalysis, generatedAnswer, readinessReport };
+
+    console.warn('[runFullLastLook] WARNING: Running in LOCAL DEMO mode (no real AI). Set Supabase env vars for real AI.');
+
+    return {
+      briefAnalysis,
+      generatedAnswer,
+      readinessReport,
+      debug: {
+        inputHash,
+        cacheHit: false,
+        providerUsed: 'demo',
+        fallbackUsed: true,
+        isRealAI: false,
+        temperature: 0,
+        topP: 1,
+        stagesCompleted: ['parseBrief', 'generateAnswer', 'buildFullReviewPacket'],
+        timings: [
+          { stage: 'parseBrief', startTime: stage1Start, endTime: stage1Start + stage1Duration, durationMs: stage1Duration, status: 'completed' },
+          { stage: 'generateAnswer', startTime: stage2Start, endTime: stage2Start + stage2Duration, durationMs: stage2Duration, status: 'completed' },
+          { stage: 'buildFullReviewPacket', startTime: stage3Start, endTime: stage3Start + stage3Duration, durationMs: stage3Duration, status: 'completed' },
+        ],
+        totalDurationMs: totalDuration,
+        apiDurationMs: totalDuration,
+      },
+    };
   }
 
-  // Real API call via orchestrated /api/full endpoint
   if (onProgress) onProgress(1);
-  const data = await post('/full', params) as any;
-  if (onProgress) onProgress(4);
+  const startTime = Date.now();
+
+  const stagesMap: Record<string, number> = {
+    normalizeInput: 0,
+    parseBriefAgent: 1,
+    buildEvidenceBankTool: 1,
+    deterministicChecksTool: 1,
+    requirementCoverageTool: 2,
+    requirementReviewerAgent: 3,
+    fitReviewerAgent: 3,
+    clarityReviewerAgent: 3,
+    evidenceReviewerAgent: 3,
+    lengthReviewerAgent: 3,
+    voiceReviewerAgent: 3,
+    riskReviewerAgent: 3,
+    scoringTool: 4,
+    nextBestEditAgent: 4,
+    fixPlanAgent: 4,
+    improvedAnswerAgent: 5,
+    applicationPacketTool: 5,
+    persistReviewSession: 6,
+    final_result: 6,
+  };
+
+  const apiParams = {
+    ...params,
+    inputHash,
+  };
+
+  const data = await post('/full', apiParams) as any;
+  const apiDuration = Date.now() - startTime;
+
+  const debugInfo = data.debug || {};
+  const resultMode = debugInfo.resultMode || 'unknown';
+  const stagesCompleted = debugInfo.stagesCompleted || [];
+  const stagesMapLocal: Record<string, number> = {
+    normalizeInput: 0, parseBriefAgent: 1, buildEvidenceBankTool: 1, deterministicChecksTool: 1,
+    requirementCoverageTool: 2, requirementReviewerAgent: 3, fitReviewerAgent: 3, clarityReviewerAgent: 3,
+    evidenceReviewerAgent: 3, lengthReviewerAgent: 3, voiceReviewerAgent: 3, riskReviewerAgent: 3,
+    scoringTool: 4, nextBestEditAgent: 4, fixPlanAgent: 4, improvedAnswerAgent: 5, applicationPacketTool: 5,
+    persistReviewSession: 6, final_result: 6,
+  };
+  const maxStep = stagesCompleted.reduce((max: number, s: string) => Math.max(max, stagesMapLocal[s] ?? 0), 0);
+  if (onProgress) onProgress(Math.min(maxStep + 2, 7));
+
+  const readinessReport = normalizeCheckResponse(data.readinessReport, data.wordCount || 150, data.speakingTimeSeconds || 60);
+
+  if (data.briefAnalysis && data.readinessReport && resultMode !== 'mock_demo' && resultMode !== 'deterministic_fallback') {
+    const packet = {
+      reviewId: data.reviewId || resultMode,
+      programName: data.programName || '',
+      applicationType: (data.applicationType || 'Fellowship') as ApplicationType,
+      briefAnalysis: data.briefAnalysis,
+      reviewerPanel: data.reviewerPanel || {},
+      readinessReport,
+      nextBestEdit: data.nextBestEdit || {},
+      fixPlan: data.fixPlan || [],
+      improvedApplication: data.improvedApplication || { originalAnswer: '', improvedAnswer: '', whatChanged: [], whyItIsBetter: [], wordCount: 0, speakingTimeSeconds: 0 },
+      requirementCoverage: data.requirementCoverage || [],
+      evidenceBank: data.evidenceBank || {},
+      deadlineMode: data.deadlineMode || { mode: 'careful' as const, timeRemaining: 'N/A', recommendation: '' },
+      applicationPacket: data.applicationPacket || { programName: '', applicationType: 'Fellowship' as ApplicationType, overallScore: 0, status: '', nextBestEdit: '', finalAnswers: [], requirementChecklist: [], requiredLinks: [], fixPlan: [], submissionChecklist: [], exportMarkdown: '' },
+    };
+    try { saveCachedReview(inputHash, packet as any); } catch {}
+  }
+
+  const isFallback = debugInfo.fallbackUsed === true || debugInfo.providerUsed === 'mock';
+  const isRealAI = debugInfo.providerUsed && !['mock', 'demo', 'cache'].includes(debugInfo.providerUsed);
+
+  if (isFallback) {
+    console.warn('[runFullLastLook] WARNING: Using fallback/deterministic mode. Real AI may have failed.');
+  }
 
   return {
     briefAnalysis: normalizeAnalyzeResponse(data.briefAnalysis),
-    generatedAnswer: normalizeGenerateResponse(data.generatedAnswer),
-    readinessReport: normalizeCheckResponse(
-      data.readinessReport, 
-      data.wordCount || 150, 
-      data.speakingTimeSeconds || 60
-    ),
+    generatedAnswer: normalizeGenerateResponse(data.improvedApplication?.originalAnswer ? { draft: data.improvedApplication.originalAnswer, whyItWorks: [], customize: [] } : data.generatedAnswer || {}),
+    readinessReport,
+    debug: {
+      inputHash,
+      cacheHit: false,
+      providerUsed: debugInfo.providerUsed || 'unknown',
+      fallbackUsed: isFallback,
+      isRealAI,
+      stagesCompleted,
+      timings: debugInfo.timings || [],
+      totalDurationMs: debugInfo.totalDurationMs || apiDuration,
+      apiDurationMs: apiDuration,
+    },
   };
 }

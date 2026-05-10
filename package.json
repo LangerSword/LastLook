@@ -10,7 +10,9 @@
     "pages:dev": "npm run build && npx wrangler@latest pages dev dist --port 8788 --ai AI --env-file .dev.vars",
     "pages:deploy": "npm run build && npx wrangler@latest pages deploy dist",
     "deploy": "npm run build && wrangler deploy",
-    "simulate:review": "tsx src/engine/simulation/runSimulation.ts"
+    "simulate:review": "cd mastra-engine && npm run simulate",
+    "simulate:determinism": "tsx src/engine/simulation/runDeterminismTest.ts",
+    "simulate:tools": "tsx src/engine/simulation/runToolBasedSimulation.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.4",
