@@ -16,6 +16,8 @@ interface Message {
 interface LLMOptions {
   temperature?: number;
   maxTokens?: number;
+  topP?: number;
+  seed?: number;
 }
 
 export async function callLLM(
@@ -23,7 +25,7 @@ export async function callLLM(
   env: Env,
   options: LLMOptions = {}
 ): Promise<{ content: string; provider: string; model: string }> {
-  const { temperature = 0.7, maxTokens = 1024 } = options;
+  const { temperature = 0.7, maxTokens = 1024, topP = 1, seed } = options;
 
   // --- Provider 1: NVIDIA NIM ---
   if (env.NVIDIA_API_KEY) {
@@ -42,6 +44,8 @@ export async function callLLM(
           model,
           messages,
           temperature,
+          top_p: topP,
+          seed: seed !== undefined ? seed : undefined,
           max_tokens: maxTokens,
         }),
       });
@@ -69,6 +73,8 @@ export async function callLLM(
       const result = await env.AI.run(model, {
         messages,
         temperature,
+        top_p: topP,
+        seed: seed !== undefined ? seed : undefined,
         max_tokens: maxTokens,
       });
       const content = result?.response || result?.result?.response || '';
@@ -84,6 +90,8 @@ export async function callLLM(
         const fallbackResult = await env.AI.run(fallbackModel, {
           messages,
           temperature,
+          top_p: topP,
+          seed: seed !== undefined ? seed : undefined,
           max_tokens: maxTokens,
         });
         const content = fallbackResult?.response || fallbackResult?.result?.response || '';
@@ -111,6 +119,8 @@ export async function callLLM(
         body: JSON.stringify({
           messages,
           temperature,
+          top_p: topP,
+          seed: seed !== undefined ? seed : undefined,
           max_tokens: maxTokens,
         }),
       });
@@ -142,6 +152,8 @@ export async function callLLM(
           body: JSON.stringify({
             messages,
             temperature,
+            top_p: topP,
+            seed: seed !== undefined ? seed : undefined,
             max_tokens: maxTokens,
           }),
         });

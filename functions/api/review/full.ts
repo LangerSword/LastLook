@@ -1,6 +1,6 @@
 import { verifyUserWithReason } from '../../lib/auth';
 import { checkAndLogUsage } from '../../lib/usage';
-import { buildFullReviewPacket, DeterministicReviewInput, type BriefAnalysis, type GeneratedAnswer } from '../../lib/reviewEngine';
+import { buildFullReviewPacket, type DeterministicReviewInput, type BriefAnalysis, type GeneratedAnswer } from '../../lib/reviewEngine';
 import { callLLM } from '../../lib/callLLM';
 
 interface Env {
@@ -71,14 +71,14 @@ function buildFallbackGeneratedAnswer(answer: string, brief: BriefAnalysis): Gen
 export const onRequestPost: PagesFunction<Env> = async (context) => {
   try {
     const result = await verifyUserWithReason(context.request, context.env);
-    
+
     if (result.error === 'server_not_configured') {
       return new Response(JSON.stringify({
         error: 'supabase_server_not_configured',
         message: 'Server auth is not configured.'
       }), { status: 401, headers: { 'Content-Type': 'application/json' } });
     }
-    
+
     if (result.error === 'no_token' || result.error === 'invalid_token') {
       return new Response(JSON.stringify({
         error: 'auth_required',
@@ -108,34 +108,68 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     const targetLength = body.targetLength || '150 words';
     const deadline = body.deadline || undefined;
     const userAnswer = body.finalAnswer?.trim() || null;
+    const inputHash = body.inputHash || null;
+    const seed = inputHash ? parseInt(inputHash.slice(0, 8), 16) % 2147483647 : undefined;
+
+    const deterministicOptions = {
+      temperature: 0,
+      topP: 1,
+      seed,
+    };
+
+    const stagesCompleted: string[] = [];
+    const overallStart = Date.now();
 
     let briefAnalysis: BriefAnalysis;
     let generatedAnswer: GeneratedAnswer | null = null;
     let aiError: string | null = null;
+    let providerUsed = 'none';
+    let fallbackUsed = false;
+    let providerResponseTime = 0;
 
     try {
-      const { content } = await callLLM([
+      stagesCompleted.push('parseBrief_start');
+      const stageStart = Date.now();
+      const analyzeResult = await callLLM([
         { role: 'system', content: ANALYZE_SYSTEM },
         { role: 'user', content: `Analyze:\n${briefText}` },
-      ], context.env);
-      briefAnalysis = parseLLMResponse<BriefAnalysis>(content, buildFallbackBriefAnalysis(briefText));
+      ], context.env, deterministicOptions);
+      providerUsed = analyzeResult.provider;
+      providerResponseTime = Date.now() - stageStart;
+      console.log(`[parseBrief] provider=${analyzeResult.provider}, duration=${providerResponseTime}ms`);
+      stagesCompleted.push('parseBrief_complete');
+      briefAnalysis = parseLLMResponse<BriefAnalysis>(analyzeResult.content, buildFallbackBriefAnalysis(briefText));
     } catch (err) {
       aiError = `Brief analysis failed: ${err}`;
+      fallbackUsed = true;
       briefAnalysis = buildFallbackBriefAnalysis(briefText);
+      stagesCompleted.push('parseBrief_fallback');
+      console.error('[parseBrief] FALLBACK:', err);
     }
 
     if (!userAnswer) {
       try {
+        stagesCompleted.push('generate_start');
+        const stageStart = Date.now();
         const genPrompt = `Memory: ${JSON.stringify(memory || {})}\nBrief: ${JSON.stringify(briefAnalysis)}\nQuestion: ${question}\nTone: ${body.tone || 'Confident'}\nTarget: ${targetLength}`;
-        const { content } = await callLLM([
+        const genResult = await callLLM([
           { role: 'system', content: 'Generate a short answer draft. Return JSON with draft, whyItWorks, customize.' },
           { role: 'user', content: genPrompt },
-        ], context.env);
-        generatedAnswer = parseLLMResponse<GeneratedAnswer>(content, buildFallbackGeneratedAnswer('', briefAnalysis));
+        ], context.env, deterministicOptions);
+        if (providerUsed === 'none') providerUsed = genResult.provider;
+        providerResponseTime += Date.now() - stageStart;
+        console.log(`[generateAnswer] provider=${genResult.provider}, duration=${Date.now() - stageStart}ms`);
+        stagesCompleted.push('generate_complete');
+        generatedAnswer = parseLLMResponse<GeneratedAnswer>(genResult.content, buildFallbackGeneratedAnswer('', briefAnalysis));
       } catch (err) {
         aiError = aiError ? `${aiError}; Generation failed: ${err}` : `Generation failed: ${err}`;
+        fallbackUsed = true;
         generatedAnswer = buildFallbackGeneratedAnswer('', briefAnalysis);
+        stagesCompleted.push('generate_fallback');
+        console.error('[generateAnswer] FALLBACK:', err);
       }
+    } else {
+      stagesCompleted.push('generate_skipped');
     }
 
     const deterministicInput: DeterministicReviewInput = {
@@ -155,7 +189,11 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
     if (aiError) {
       packet.readinessReport.warnings.push(`AI enhancement had issues: ${aiError}`);
+      packet.readinessReport.warnings.push(`Note: Using deterministic fallback because AI failed.`);
     }
+
+    const totalDuration = Date.now() - overallStart;
+    console.log(`[review/full] totalDuration=${totalDuration}ms, provider=${providerUsed}, fallbackUsed=${fallbackUsed}`);
 
     return new Response(JSON.stringify({
       success: true,
@@ -174,6 +212,19 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       applicationPacket: packet.applicationPacket,
       wordCount: packet.readinessReport.wordCount,
       speakingTimeSeconds: packet.readinessReport.speakingTimeSeconds,
+      debug: {
+        engineVersion: 'v2-mastra',
+        inputHash,
+        cacheHit: false,
+        providerUsed,
+        fallbackUsed,
+        temperature: deterministicOptions.temperature,
+        topP: deterministicOptions.topP,
+        providerResponseTimeMs: providerResponseTime,
+        totalDurationMs: totalDuration,
+        stagesCompleted,
+        resultMode: fallbackUsed ? 'deterministic_fallback' : 'ai_full',
+      },
     }), {
       headers: { 'Content-Type': 'application/json' },
     });

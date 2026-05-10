@@ -16,6 +16,15 @@ interface Env {
   ADMIN_EMAILS?: string;
 }
 
+interface StageTiming {
+  stage: string;
+  startTime: number;
+  endTime: number;
+  durationMs: number;
+  status: 'completed' | 'failed' | 'fallback' | 'skipped';
+  error?: string;
+}
+
 const ANALYZE_SYSTEM = `You are an application brief analyzer for student applications.
 
 Given an application brief, analyze it and return a JSON object with these exact fields:
@@ -111,6 +120,20 @@ function buildFallbackGeneratedAnswer(answer: string, brief: BriefAnalysis): Gen
 }
 
 export const onRequestPost: PagesFunction<Env> = async (context) => {
+  const overallStart = Date.now();
+  const timings: StageTiming[] = [];
+
+  function recordTiming(stage: string, startTime: number, status: StageTiming['status'], error?: string) {
+    timings.push({
+      stage,
+      startTime,
+      endTime: Date.now(),
+      durationMs: Date.now() - startTime,
+      status,
+      error,
+    });
+  }
+
   try {
     const result = await verifyUserWithReason(context.request, context.env);
     
@@ -153,27 +176,49 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     const targetLength = body.targetLength || '150 words';
     const deadline = body.deadline || undefined;
     const userAnswer = body.finalAnswer?.trim() || null;
+    const inputHash = body.inputHash || null;
+    const seed = inputHash ? parseInt(inputHash.slice(0, 8), 16) % 2147483647 : undefined;
+
+    const deterministicOptions = {
+      temperature: 0,
+      topP: 1,
+      seed,
+    };
 
     let briefAnalysis: BriefAnalysis;
     let generatedAnswer: GeneratedAnswer | null = null;
     let aiError: string | null = null;
+    let providerUsed = 'none';
+    let fallbackUsed = false;
+    let providerResponseTime = 0;
 
+    // Stage 1: parseBrief
+    let stageStart = Date.now();
     try {
-      const { content: rawAnalyze } = await callLLM(
+      const { content, provider, model } = await callLLM(
         [
           { role: 'system', content: ANALYZE_SYSTEM },
           { role: 'user', content: `Analyze this application brief:\n\n${briefText}` },
         ],
-        context.env
+        context.env,
+        deterministicOptions
       );
-
-      briefAnalysis = parseLLMResponse<BriefAnalysis>(rawAnalyze, buildFallbackBriefAnalysis(briefText));
+      providerUsed = provider;
+      providerResponseTime = Date.now() - stageStart;
+      console.log(`[parseBrief] provider=${provider}, model=${model}, duration=${providerResponseTime}ms`);
+      recordTiming('parseBrief', stageStart, 'completed');
+      briefAnalysis = parseLLMResponse<BriefAnalysis>(content, buildFallbackBriefAnalysis(briefText));
     } catch (err) {
       aiError = `Brief analysis failed: ${err}`;
+      fallbackUsed = true;
       briefAnalysis = buildFallbackBriefAnalysis(briefText);
+      recordTiming('parseBrief', stageStart, 'fallback', String(err));
+      console.error('[parseBrief] FALLBACK:', err);
     }
 
+    // Stage 2: generateAnswer (if no user answer provided)
     if (!userAnswer) {
+      stageStart = Date.now();
       try {
         const genPrompt = `Memory: ${JSON.stringify(memory || {})}
 Brief Analysis: ${JSON.stringify(briefAnalysis)}
@@ -187,21 +232,34 @@ Deadline: ${deadline || 'Not provided'}
 
 Generate a tailored answer draft.`;
 
-        const { content: rawGenerate } = await callLLM(
+        const { content, provider, model } = await callLLM(
           [
             { role: 'system', content: GENERATE_SYSTEM },
             { role: 'user', content: genPrompt },
           ],
-          context.env
+          context.env,
+          deterministicOptions
         );
-
-        generatedAnswer = parseLLMResponse<GeneratedAnswer>(rawGenerate, buildFallbackGeneratedAnswer('', briefAnalysis));
+        if (providerUsed === 'none') {
+          providerUsed = provider;
+        }
+        providerResponseTime += Date.now() - stageStart;
+        console.log(`[generateAnswer] provider=${provider}, model=${model}, duration=${Date.now() - stageStart}ms`);
+        recordTiming('generateAnswer', stageStart, 'completed');
+        generatedAnswer = parseLLMResponse<GeneratedAnswer>(content, buildFallbackGeneratedAnswer('', briefAnalysis));
       } catch (err) {
         aiError = aiError ? `${aiError}; Generation failed: ${err}` : `Generation failed: ${err}`;
+        fallbackUsed = true;
         generatedAnswer = buildFallbackGeneratedAnswer('', briefAnalysis);
+        recordTiming('generateAnswer', stageStart, 'fallback', String(err));
+        console.error('[generateAnswer] FALLBACK:', err);
       }
+    } else {
+      recordTiming('generateAnswer', Date.now(), 'skipped');
     }
 
+    // Stage 3: buildFullReviewPacket
+    stageStart = Date.now();
     const deterministicInput: DeterministicReviewInput = {
       briefAnalysis,
       answer: userAnswer || generatedAnswer?.draft || '',
@@ -216,13 +274,19 @@ Generate a tailored answer draft.`;
     };
 
     const fullReviewPacket = buildFullReviewPacket(deterministicInput);
+    recordTiming('buildFullReviewPacket', stageStart, 'completed');
 
     if (aiError) {
       fullReviewPacket.readinessReport.warnings.push(`AI enhancement had issues: ${aiError}`);
+      fullReviewPacket.readinessReport.warnings.push(`Note: Using deterministic fallback because AI failed.`);
     }
 
     const wordCount = fullReviewPacket.readinessReport.wordCount;
     const speakingTimeSeconds = fullReviewPacket.readinessReport.speakingTimeSeconds;
+
+    const totalDuration = Date.now() - overallStart;
+
+    console.log(`[FullReview] totalDuration=${totalDuration}ms, provider=${providerUsed}, fallbackUsed=${fallbackUsed}`);
 
     return new Response(JSON.stringify({
       success: true,
@@ -242,6 +306,19 @@ Generate a tailored answer draft.`;
       generatedAnswer,
       wordCount,
       speakingTimeSeconds,
+      debug: {
+        engineVersion: 'v2',
+        inputHash,
+        cacheHit: false,
+        providerUsed,
+        fallbackUsed,
+        temperature: deterministicOptions.temperature,
+        topP: deterministicOptions.topP,
+        providerResponseTimeMs: providerResponseTime,
+        totalDurationMs: totalDuration,
+        stagesCompleted: timings.map(t => t.stage),
+        timings,
+      },
     }), {
       headers: { 'Content-Type': 'application/json' },
     });
@@ -252,4 +329,15 @@ Generate a tailored answer draft.`;
       headers: { 'Content-Type': 'application/json' },
     });
   }
+};
+
+export const onRequestOptions: PagesFunction<Env> = async (context) => {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    },
+  });
 };
